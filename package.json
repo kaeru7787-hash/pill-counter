@@ -1,0 +1,30 @@
+{
+  "name": "pill-counter-local",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --configLoader runner",
+    "build": "tsc --noEmit && node scripts/assets.mjs && vite build --configLoader runner && node scripts/service-worker.mjs",
+    "preview": "vite preview --configLoader runner --host 127.0.0.1",
+    "test": "node scripts/run.mjs tests/core.test.ts --test",
+    "fixtures": "node scripts/run.mjs scripts/fixtures.ts",
+    "evaluate": "node scripts/run.mjs scripts/evaluate.ts",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "@techstark/opencv-js": "4.12.0-release.1",
+    "onnxruntime-web": "1.22.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.1",
+    "@types/node": "^24.5.2",
+    "@types/pngjs": "^6.0.5",
+    "esbuild": "^0.28.2",
+    "pngjs": "^7.0.0",
+    "prettier": "3.6.2",
+    "sharp": "0.34.5",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.7"
+  }
+}
