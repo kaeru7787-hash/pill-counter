@@ -1,0 +1,353 @@
+{
+  "generatedAt": "2026-09-24T09:14:12.140Z",
+  "scope": "Synthetic fixtures are not evidence of clinical or real-photo accuracy.",
+  "metrics": {
+    "images": 17,
+    "exactCountAccuracy": 0.35294117647058826,
+    "meanAbsoluteError": 8.294117647058824,
+    "meanAbsolutePercentageError": 0.3197916666666667,
+    "withinOneAccuracy": 0.4117647058823529,
+    "mapeExcludedZeroTruth": 1
+  },
+  "rows": [
+    {
+      "file": "01-white-separated.png",
+      "kind": "synthetic",
+      "truth": 24,
+      "predicted": 24,
+      "error": 0,
+      "absolutePercentageError": 0,
+      "confidence": "medium",
+      "counts": {
+        "A": 24,
+        "B": 24,
+        "C": 24
+      },
+      "category": "None",
+      "notes": "",
+      "reasons": [
+        "画像処理の結果は安定。AIによる独立照合は未実施",
+        "信頼度は一致度の目安です。実写精度は未検証です"
+      ]
+    },
+    {
+      "file": "02-yellow-oval.png",
+      "kind": "synthetic",
+      "truth": 15,
+      "predicted": 15,
+      "error": 0,
+      "absolutePercentageError": 0,
+      "confidence": "medium",
+      "counts": {
+        "A": 15,
+        "B": 15,
+        "C": 15
+      },
+      "category": "None",
+      "notes": "",
+      "reasons": [
+        "画像処理の結果は安定。AIによる独立照合は未実施",
+        "信頼度は一致度の目安です。実写精度は未検証です"
+      ]
+    },
+    {
+      "file": "03-capsules.png",
+      "kind": "synthetic",
+      "truth": 12,
+      "predicted": 12,
+      "error": 0,
+      "absolutePercentageError": 0,
+      "confidence": "medium",
+      "counts": {
+        "A": 12,
+        "B": 12,
+        "C": 12
+      },
+      "category": "None",
+      "notes": "",
+      "reasons": [
+        "画像処理の結果は安定。AIによる独立照合は未実施",
+        "信頼度は一致度の目安です。実写精度は未検証です"
+      ]
+    },
+    {
+      "file": "04-touching-pairs.png",
+      "kind": "synthetic",
+      "truth": 4,
+      "predicted": 3,
+      "error": -1,
+      "absolutePercentageError": 0.25,
+      "confidence": "medium",
+      "counts": {
+        "A": 2,
+        "B": 3,
+        "C": 3
+      },
+      "category": "Merged pills",
+      "notes": "合成ケースの想定原因。位置アノテーションとの精査が必要",
+      "reasons": [
+        "画像処理の結果は安定。AIによる独立照合は未実施",
+        "信頼度は一致度の目安です。実写精度は未検証です"
+      ]
+    },
+    {
+      "file": "05-touching-three.png",
+      "kind": "synthetic",
+      "truth": 3,
+      "predicted": 1,
+      "error": -2,
+      "absolutePercentageError": 0.6666666666666666,
+      "confidence": "medium",
+      "counts": {
+        "A": 1,
+        "B": 1,
+        "C": 1
+      },
+      "category": "Merged pills",
+      "notes": "合成ケースの想定原因。位置アノテーションとの精査が必要",
+      "reasons": [
+        "画像処理の結果は安定。AIによる独立照合は未実施",
+        "信頼度は一致度の目安です。実写精度は未検証です"
+      ]
+    },
+    {
+      "file": "06-mixed-sizes.png",
+      "kind": "synthetic",
+      "truth": 15,
+      "predicted": 13,
+      "error": -2,
+      "absolutePercentageError": 0.13333333333333333,
+      "confidence": "review",
+      "counts": {
+        "A": 15,
+        "B": 13,
+        "C": 13
+      },
+      "category": "False Negative",
+      "notes": "合成ケースの想定原因。位置アノテーションとの精査が必要",
+      "reasons": [
+        "面積分布に大きな候補：大型錠剤または接触の可能性",
+        "解析方法の個数が不一致（差 2）"
+      ]
+    },
+    {
+      "file": "07-scored-tablets.png",
+      "kind": "synthetic",
+      "truth": 15,
+      "predicted": 15,
+      "error": 0,
+      "absolutePercentageError": 0,
+      "confidence": "medium",
+      "counts": {
+        "A": 15,
+        "B": 15,
+        "C": 15
+      },
+      "category": "None",
+      "notes": "",
+      "reasons": [
+        "画像処理の結果は安定。AIによる独立照合は未実施",
+        "信頼度は一致度の目安です。実写精度は未検証です"
+      ]
+    },
+    {
+      "file": "08-tray-rim.png",
+      "kind": "synthetic",
+      "truth": 15,
+      "predicted": 1,
+      "error": -14,
+      "absolutePercentageError": 0.9333333333333333,
+      "confidence": "review",
+      "counts": {
+        "A": 1,
+        "B": 1,
+        "C": 15
+      },
+      "category": "Background",
+      "notes": "合成ケースの想定原因。位置アノテーションとの精査が必要",
+      "reasons": [
+        "形状または境界に不確かな候補があります",
+        "前景が広すぎます。解析範囲・背景を確認",
+        "解析方法の個数が不一致（差 14）",
+        "解析条件によって検出位置が変化"
+      ]
+    },
+    {
+      "file": "09-bag-artifacts.png",
+      "kind": "synthetic",
+      "truth": 15,
+      "predicted": 9,
+      "error": -6,
+      "absolutePercentageError": 0.4,
+      "confidence": "review",
+      "counts": {
+        "A": 13,
+        "B": 9,
+        "C": 10
+      },
+      "category": "Bag artifact",
+      "notes": "合成ケースの想定原因。位置アノテーションとの精査が必要",
+      "reasons": [
+        "透明袋：反射・印字・溶着部の目視確認が必要",
+        "解析方法の個数が不一致（差 4）"
+      ]
+    },
+    {
+      "file": "10-desk-color.png",
+      "kind": "synthetic",
+      "truth": 15,
+      "predicted": 10,
+      "error": -5,
+      "absolutePercentageError": 0.3333333333333333,
+      "confidence": "review",
+      "counts": {
+        "A": 15,
+        "B": 10,
+        "C": 10
+      },
+      "category": "Background",
+      "notes": "合成ケースの想定原因。位置アノテーションとの精査が必要",
+      "reasons": [
+        "解析方法の個数が不一致（差 5）"
+      ]
+    },
+    {
+      "file": "11-specks.png",
+      "kind": "synthetic",
+      "truth": 15,
+      "predicted": 10,
+      "error": -5,
+      "absolutePercentageError": 0.3333333333333333,
+      "confidence": "review",
+      "counts": {
+        "A": 15,
+        "B": 10,
+        "C": 10
+      },
+      "category": "False Positive",
+      "notes": "合成ケースの想定原因。位置アノテーションとの精査が必要",
+      "reasons": [
+        "解析方法の個数が不一致（差 5）"
+      ]
+    },
+    {
+      "file": "12-shadow.png",
+      "kind": "synthetic",
+      "truth": 15,
+      "predicted": 10,
+      "error": -5,
+      "absolutePercentageError": 0.3333333333333333,
+      "confidence": "review",
+      "counts": {
+        "A": 15,
+        "B": 10,
+        "C": 10
+      },
+      "category": "Background",
+      "notes": "合成ケースの想定原因。位置アノテーションとの精査が必要",
+      "reasons": [
+        "解析方法の個数が不一致（差 5）"
+      ]
+    },
+    {
+      "file": "13-empty.png",
+      "kind": "synthetic",
+      "truth": 0,
+      "predicted": 0,
+      "error": 0,
+      "absolutePercentageError": null,
+      "confidence": "review",
+      "counts": {
+        "A": 0,
+        "B": 0,
+        "C": 0
+      },
+      "category": "None",
+      "notes": "",
+      "reasons": [
+        "背景との色差が小さい",
+        "錠剤候補を検出できませんでした"
+      ]
+    },
+    {
+      "file": "14-dense-90.png",
+      "kind": "synthetic",
+      "truth": 90,
+      "predicted": 0,
+      "error": -90,
+      "absolutePercentageError": 1,
+      "confidence": "review",
+      "counts": {
+        "A": 90,
+        "B": 0,
+        "C": 0
+      },
+      "category": "Clean",
+      "notes": "合成ケースの想定原因。位置アノテーションとの精査が必要",
+      "reasons": [
+        "錠剤候補を検出できませんでした",
+        "解析方法の個数が不一致（差 90）"
+      ]
+    },
+    {
+      "file": "15-edge-cut.png",
+      "kind": "synthetic",
+      "truth": 2,
+      "predicted": 2,
+      "error": 0,
+      "absolutePercentageError": 0,
+      "confidence": "review",
+      "counts": {
+        "A": 2,
+        "B": 2,
+        "C": 2
+      },
+      "category": "None",
+      "notes": "",
+      "reasons": [
+        "形状または境界に不確かな候補があります"
+      ]
+    },
+    {
+      "file": "16-low-contrast.png",
+      "kind": "synthetic",
+      "truth": 15,
+      "predicted": 10,
+      "error": -5,
+      "absolutePercentageError": 0.3333333333333333,
+      "confidence": "review",
+      "counts": {
+        "A": 15,
+        "B": 10,
+        "C": 15
+      },
+      "category": "False Negative",
+      "notes": "合成ケースの想定原因。位置アノテーションとの精査が必要",
+      "reasons": [
+        "解析方法の個数が不一致（差 5）",
+        "解析条件によって検出位置が変化"
+      ]
+    },
+    {
+      "file": "17-white-reflection.png",
+      "kind": "synthetic",
+      "truth": 15,
+      "predicted": 9,
+      "error": -6,
+      "absolutePercentageError": 0.4,
+      "confidence": "review",
+      "counts": {
+        "A": 13,
+        "B": 9,
+        "C": 10
+      },
+      "category": "Reflection",
+      "notes": "合成ケースの想定原因。位置アノテーションとの精査が必要",
+      "reasons": [
+        "透明袋：反射・印字・溶着部の目視確認が必要",
+        "白飛びが多く、反射と錠剤の区別が不安定",
+        "解析方法の個数が不一致（差 4）"
+      ]
+    }
+  ]
+}
