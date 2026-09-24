@@ -1,0 +1,175 @@
+import { test, expect } from "@playwright/test";
+import { createServer } from "node:http";
+import { readFile } from "node:fs/promises";
+import { resolve, extname, sep } from "node:path";
+import sharp from "sharp";
+test("JPEG EXIF orientation is applied before overlay coordinates", async ({
+  page,
+}) => {
+  const jpeg = await sharp("tests/images/01-white-separated.png")
+    .jpeg()
+    .withMetadata({ orientation: 6 })
+    .toBuffer();
+  await page.goto("./");
+  await page
+    .locator("#file")
+    .setInputFiles({
+      name: "oriented.jpg",
+      mimeType: "image/jpeg",
+      buffer: jpeg,
+    });
+  await expect(page.locator("#status")).toContainText("解析完了");
+  await expect(page.locator("#image-meta")).toHaveText("480 × 640");
+  await expect(page.locator("#count")).toHaveText("24");
+});
+test("camera controls, analysis, numbering, corrections, ROI, debug and local export", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  const outgoing: string[] = [];
+  page.on("request", (r) => {
+    const u = new URL(r.url());
+    if (
+      ["http:", "https:"].includes(u.protocol) &&
+      !u.hostname.match(/^(127\.0\.0\.1|localhost)$/)
+    )
+      outgoing.push(r.url());
+  });
+  await page.goto("./");
+  await expect(page.locator("#camera")).toHaveAttribute(
+    "capture",
+    "environment",
+  );
+  await page
+    .locator("#file")
+    .setInputFiles("tests/images/01-white-separated.png");
+  await expect(page.locator("#status")).toContainText("解析完了");
+  await expect(page.locator("#count")).toHaveText("24");
+  await expect(page.locator("#list button")).toHaveCount(24);
+  await expect(page.locator("#confidence")).toHaveText("中");
+  await page.locator('[data-mode="add"]').click();
+  const canvas = page.locator("#image-canvas");
+  await canvas.scrollIntoViewIfNeeded();
+  const box = (await canvas.boundingBox())!;
+  await canvas.click({
+    position: { x: box.width * 0.88, y: box.height * 0.85 },
+  });
+  await expect(page.locator("#count")).toHaveText("25");
+  await page.locator("#undo").click();
+  await expect(page.locator("#count")).toHaveText("24");
+  await page.locator("#detection-list summary").click();
+  await page.locator("#list button").first().click();
+  await page.locator("#delete-selected").click();
+  await expect(page.locator("#count")).toHaveText("23");
+  await page.locator("#confirmed").check();
+  await expect(page.locator("#count-label")).toHaveText("目視確認済みの個数");
+  await page.locator("#save").click();
+  await expect(page.locator("#status")).toContainText("この端末に保存");
+  const downloadPromise = page.waitForEvent("download");
+  await page.locator("#export").click();
+  const download = await downloadPromise;
+  const stream = await download.createReadStream();
+  let text = "";
+  for await (const part of stream!) text += part.toString();
+  const data = JSON.parse(text);
+  expect(data.records[0].corrected).toHaveLength(23);
+  expect(data.records[0].analysis.detections).toHaveLength(24);
+  expect(data.records[0].original).toMatch(/^data:image\/png;base64,/);
+  expect(data.records[0].confirmed).toBe(true);
+  page.on("dialog", (d) => d.accept());
+  await page.locator("#debug").check();
+  await expect(page.locator("#status")).toContainText("解析完了");
+  await expect(page.locator("#count")).toHaveText("24");
+  await page.locator("#layer").selectOption("Distance transform");
+  await expect(page.locator("#diagnostics")).toContainText("Lab");
+  await page.locator('[data-mode="roi"]').click();
+  await page.locator("#canvas-wrap").evaluate((el) => {
+    el.scrollTop = 0;
+    el.scrollLeft = 0;
+    el.scrollIntoView({ block: "start" });
+  });
+  const rect = (await canvas.boundingBox())!;
+  await page.mouse.move(
+    rect.x + (rect.width * 15) / 640,
+    rect.y + (rect.height * 15) / 480,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    rect.x + (rect.width * 180) / 640,
+    rect.y + (rect.height * 85) / 480,
+    { steps: 10 },
+  );
+  await page.mouse.up();
+  await expect(page.locator("#count")).toHaveText("2");
+  await expect(page.locator("#status")).toContainText("解析完了");
+  await page.locator("#reset-roi").click();
+  await expect(page.locator("#count")).toHaveText("24");
+  expect(outgoing).toEqual([]);
+  expect(errors).toEqual([]);
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > window.innerWidth + 1,
+  );
+  expect(overflow).toBe(false);
+  await page.screenshot({
+    path: `tests/reports/ui-${test.info().project.name}.png`,
+    fullPage: true,
+  });
+});
+test("PWA reload and fresh analysis work with the origin server stopped", async ({
+  page,
+}) => {
+  // Stop a real origin: WebKit offline emulation rejects SW navigation (Playwright #42775).
+  const root = resolve("dist"),
+    mime: Record<string, string> = {
+      ".html": "text/html",
+      ".js": "text/javascript",
+      ".mjs": "text/javascript",
+      ".css": "text/css",
+      ".png": "image/png",
+      ".svg": "image/svg+xml",
+      ".json": "application/json",
+      ".wasm": "application/wasm",
+    };
+  const server = createServer(async (req, res) => {
+    try {
+      const url = new URL(req.url!, "http://localhost");
+      const rel = url.pathname.replace(/^\/pill-counter\//, "") || "index.html";
+      const file = resolve(root, rel);
+      if (!file.startsWith(root + sep)) throw new Error("invalid path");
+      const bytes = await readFile(file);
+      res.writeHead(200, {
+        "Content-Type": mime[extname(file)] || "application/octet-stream",
+      });
+      res.end(bytes);
+    } catch {
+      res.writeHead(404);
+      res.end();
+    }
+  });
+  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+  const address = server.address() as { port: number };
+  try {
+    await page.goto(`http://127.0.0.1:${address.port}/pill-counter/`);
+    await expect(page.locator("#offline")).toHaveText("オフライン対応");
+    await page.locator("#demo").click();
+    await expect(page.locator("#count")).toHaveText("24");
+    await page.waitForFunction(
+      () => navigator.serviceWorker.controller !== null,
+    );
+    server.closeAllConnections();
+    await new Promise<void>((done, reject) =>
+      server.close((e) => (e ? reject(e) : done())),
+    );
+    await page.reload();
+    await page
+      .locator("#file")
+      .setInputFiles("tests/images/04-touching-pairs.png");
+    await expect(page.locator("#status")).toContainText("解析完了");
+    await expect(page.locator("#count")).toHaveText("4");
+    await expect(page.locator("#confidence")).toHaveText("要確認");
+  } finally {
+    server.closeAllConnections();
+    server.close();
+  }
+});
