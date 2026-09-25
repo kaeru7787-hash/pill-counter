@@ -1,0 +1,19 @@
+{
+  "file": "22-yellow-tray-oblong",
+  "version": "0.2.0",
+  "width": 1512,
+  "height": 2016,
+  "scene": "tray",
+  "detected": 32,
+  "counts": {
+    "A": 4,
+    "B": 32,
+    "C": 40
+  },
+  "diagnostics": [
+    "面積異常の再分割: 32 → 41",
+    "除外候補: A=5, B=25, C=32",
+    "Lab色差 Otsu=94.0",
+    "表示する検出集合: B"
+  ]
+}

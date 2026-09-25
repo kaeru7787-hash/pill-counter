@@ -1,0 +1,18 @@
+{
+  "file": "21-yellow-tray-round",
+  "version": "0.2.0",
+  "width": 1512,
+  "height": 2016,
+  "scene": "tray",
+  "detected": 3,
+  "counts": {
+    "A": 3,
+    "B": 3,
+    "C": 5
+  },
+  "diagnostics": [
+    "除外候補: A=51, B=172, C=157",
+    "Lab色差 Otsu=61.0",
+    "表示する検出集合: B"
+  ]
+}
