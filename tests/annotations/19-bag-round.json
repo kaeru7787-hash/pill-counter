@@ -1,0 +1,20 @@
+{
+  "width": 1368,
+  "height": 1824,
+  "tolerance": 30,
+  "method": "Manual centers from the original photograph; evaluation only, not used by inference.",
+  "centers": [
+    [444, 910],
+    [428, 996],
+    [513, 985],
+    [595, 987],
+    [414, 1075],
+    [516, 1068],
+    [599, 1070],
+    [682, 1074],
+    [472, 1136],
+    [555, 1140],
+    [639, 1144],
+    [722, 1145]
+  ]
+}
