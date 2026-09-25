@@ -1,4 +1,5 @@
 import test from "node:test";
+import { positionMetrics } from "../src/vision/positionMetrics";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { PNG } from "pngjs";
@@ -159,4 +160,74 @@ test("bag and empty photos never get confident confirmation", async () => {
     });
     assert.equal(r.confidence.level, "review");
   }
+});
+
+test("position evaluation prevents FP and FN cancellation and reassigns ambiguous matches", async () => {
+  const p = positionMetrics(
+    [
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+    ],
+    [
+      { x: 0, y: 0 },
+      { x: 20, y: 0 },
+    ],
+    2,
+  );
+  assert.equal(p.tp, 1);
+  assert.equal(p.fp, 1);
+  assert.equal(p.fn, 1);
+  const q = positionMetrics(
+    [
+      { x: 4, y: 0 },
+      { x: 0, y: 0 },
+    ],
+    [
+      { x: 0, y: 0 },
+      { x: 8, y: 0 },
+    ],
+    5,
+  );
+  assert.equal(q.tp, 2);
+});
+test("real tray is scale-stable and manual ROI debug retains image coordinates", async () => {
+  const { data, info } = await sharp("tests/images/18-real-tray.jpg")
+    .resize({ height: 1280 })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const image = {
+    width: info.width,
+    height: info.height,
+    data: new Uint8ClampedArray(data),
+  };
+  const r = await analyze(image, {
+    scene: "tray",
+    autoROI: true,
+    debug: false,
+  });
+  assert.equal(r.detections.length, 90);
+  const roi = {
+    x: info.width * 0.17,
+    y: info.height * 0.24,
+    width: info.width * 0.6,
+    height: info.height * 0.43,
+  };
+  const m = await analyze(image, {
+    scene: "tray",
+    autoROI: false,
+    debug: true,
+    roi,
+  });
+  assert.equal(m.detections.length, 90);
+  assert.deepEqual(m.debug.Threshold.origin, { x: 0, y: 0 });
+  assert.ok(
+    m.detections.every(
+      (d) =>
+        d.center.x >= roi.x &&
+        d.center.x < roi.x + roi.width &&
+        d.center.y >= roi.y &&
+        d.center.y < roi.y + roi.height,
+    ),
+  );
 });

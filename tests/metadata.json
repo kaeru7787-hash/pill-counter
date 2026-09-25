@@ -1256,5 +1256,11 @@
         "y": 303.33333333333337
       }
     ]
+  },
+  "18-real-tray.jpg": {
+    "kind": "real",
+    "scene": "tray",
+    "category": "Merged pills / Background",
+    "autoROI": true
   }
 }
