@@ -4,6 +4,8 @@ type ModelConfig = {
   format: "yolov8-detect";
   inputSize: number;
   classes: number;
+  /** Winning classes that represent countable pills; other objects are excluded. */
+  allowedClasses?: number[];
   scoreThreshold: number;
   iouThreshold: number;
 };
@@ -43,7 +45,11 @@ export function decodeYolo(
         score = data[(4 + c) * n + i];
         cls = c;
       }
-    if (score < config.scoreThreshold) continue;
+    if (
+      score < config.scoreThreshold ||
+      (config.allowedClasses && !config.allowedClasses.includes(cls))
+    )
+      continue;
     const cx = (data[i] - padX) / scale + roi.x,
       cy = (data[n + i] - padY) / scale + roi.y,
       w = data[2 * n + i] / scale,
@@ -114,6 +120,14 @@ export async function detectAI(
       !Number.isInteger(config.classes) ||
       config.classes < 1 ||
       config.classes > 100 ||
+      (config.allowedClasses !== undefined &&
+        (!Array.isArray(config.allowedClasses) ||
+          !config.allowedClasses.length ||
+          config.allowedClasses.some(
+            (c) => !Number.isInteger(c) || c < 0 || c >= config.classes,
+          ))) ||
+      !Number.isFinite(config.scoreThreshold) ||
+      !Number.isFinite(config.iouThreshold) ||
       config.scoreThreshold <= 0 ||
       config.scoreThreshold >= 1 ||
       config.iouThreshold <= 0 ||
