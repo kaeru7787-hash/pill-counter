@@ -1,5 +1,5 @@
 import type { Analysis, Detection, Point, ROI } from "../types";
-export type Mode = "select" | "add" | "delete" | "roi";
+export type Mode = "select" | "add" | "delete" | "roi" | "batch";
 export class ImageViewer {
   original?: HTMLCanvasElement;
   analysis?: Analysis;
@@ -14,6 +14,7 @@ export class ImageViewer {
   onAdd: (p: Point) => void = () => {};
   onDelete: (id: string) => void = () => {};
   onROI: (roi: ROI) => void = () => {};
+  onBatch: (roi: ROI) => void = () => {};
   constructor(public canvas: HTMLCanvasElement) {
     canvas.addEventListener("pointerdown", (e) => {
       if (!this.original) return;
@@ -21,7 +22,7 @@ export class ImageViewer {
       canvas.setPointerCapture(e.pointerId);
     });
     canvas.addEventListener("pointermove", (e) => {
-      if (this.mode === "roi" && this.start) {
+      if ((this.mode === "roi" || this.mode === "batch") && this.start) {
         this.dragging = this.rectangle(this.start, this.point(e));
         this.draw();
       }
@@ -36,15 +37,18 @@ export class ImageViewer {
       const p = this.point(e),
         start = this.start;
       this.start = undefined;
-      if (this.mode === "roi") {
+      if (this.mode === "roi" || this.mode === "batch") {
         const r = this.rectangle(start, p);
         this.dragging = undefined;
         if (
           r.width > this.canvas.width * 0.025 &&
           r.height > this.canvas.height * 0.025
         ) {
-          this.roi = r;
-          this.onROI(r);
+          if (this.mode === "batch") this.onBatch(r);
+          else {
+            this.roi = r;
+            this.onROI(r);
+          }
         }
         this.draw();
         return;
@@ -128,10 +132,14 @@ export class ImageViewer {
         );
       ctx.fillStyle = "#17242d";
       ctx.fillRect(0, 0, c.width, c.height);
-      ctx.drawImage(off, this.analysis!.roi.x, this.analysis!.roi.y);
+      const origin = debug.origin || this.analysis!.roi;
+      ctx.drawImage(off, origin.x, origin.y);
     }
     if (["Final detections", "Contours"].includes(this.layer))
-      this.detections.forEach((d, i) => {
+      (this.layer === "Contours"
+        ? this.analysis?.candidates || this.detections
+        : this.detections
+      ).forEach((d, i) => {
         const selected = d.id === this.selected;
         ctx.beginPath();
         d.contour.forEach((p, j) =>
@@ -150,9 +158,20 @@ export class ImageViewer {
         if (this.layer === "Contours") return;
         const screenScale =
             c.width / Math.max(1, c.getBoundingClientRect().width),
+          nearest = Math.min(
+            ...this.detections
+              .filter((e) => e.id !== d.id)
+              .map((e) =>
+                Math.hypot(d.center.x - e.center.x, d.center.y - e.center.y),
+              ),
+          ),
           r = Math.max(
-            8.5 * screenScale,
-            Math.min(Math.sqrt(d.area) * 0.19, 12 * screenScale),
+            2,
+            Math.min(
+              nearest * 0.32,
+              Math.sqrt(d.area) * 0.22,
+              11 * screenScale,
+            ),
           );
         ctx.beginPath();
         ctx.arc(d.center.x, d.center.y, r, 0, Math.PI * 2);
