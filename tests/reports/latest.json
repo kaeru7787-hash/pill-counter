@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-09-25T00:20:39.708Z",
-  "scope": "One development real image plus synthetic regression fixtures. Not an independent clinical validation set.",
+  "generatedAt": "2026-09-25T02:55:32.133Z",
+  "scope": "Development photographs and synthetic regression fixtures. Not an independent clinical validation set.",
   "metrics": {
-    "images": 18,
+    "images": 20,
     "exactCountAccuracy": 1,
     "meanAbsoluteError": 0,
     "meanAbsolutePercentageError": 0,
@@ -19,7 +19,7 @@
       "mapeExcludedZeroTruth": 1
     },
     "real": {
-      "images": 1,
+      "images": 3,
       "exactCountAccuracy": 1,
       "meanAbsoluteError": 0,
       "meanAbsolutePercentageError": 0,
@@ -503,6 +503,118 @@
           86,
           85,
           88
+        ],
+        "missingTruth": []
+      }
+    },
+    {
+      "file": "19-bag-round.jpg",
+      "kind": "real",
+      "truth": 12,
+      "predicted": 12,
+      "error": 0,
+      "absolutePercentageError": 0,
+      "confidence": "review",
+      "counts": {
+        "A": 1,
+        "B": 12,
+        "C": 6
+      },
+      "category": "None",
+      "notes": "",
+      "reasons": [
+        "透明袋・着色錠剤の補助検出。反射、刻印、重なりを手動確認してください",
+        "形状照合と距離分離の一致は保証されていません"
+      ],
+      "absoluteCountError": 0,
+      "position": {
+        "tp": 12,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1,
+        "matchedPredictions": [
+          0,
+          3,
+          1,
+          2,
+          7,
+          4,
+          5,
+          6,
+          8,
+          9,
+          10,
+          11
+        ],
+        "missingTruth": []
+      }
+    },
+    {
+      "file": "20-bag-oblong.jpg",
+      "kind": "real",
+      "truth": 36,
+      "predicted": 36,
+      "error": 0,
+      "absolutePercentageError": 0,
+      "confidence": "review",
+      "counts": {
+        "A": 1,
+        "B": 36,
+        "C": 14
+      },
+      "category": "None",
+      "notes": "",
+      "reasons": [
+        "透明袋・着色錠剤の補助検出。反射、刻印、重なりを手動確認してください",
+        "形状照合と距離分離の一致は保証されていません"
+      ],
+      "absoluteCountError": 0,
+      "position": {
+        "tp": 36,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1,
+        "matchedPredictions": [
+          1,
+          0,
+          2,
+          3,
+          4,
+          5,
+          9,
+          8,
+          7,
+          10,
+          6,
+          12,
+          11,
+          13,
+          14,
+          17,
+          23,
+          24,
+          20,
+          15,
+          19,
+          21,
+          16,
+          22,
+          18,
+          25,
+          26,
+          32,
+          33,
+          35,
+          34,
+          31,
+          28,
+          27,
+          29,
+          30
         ],
         "missingTruth": []
       }

@@ -1,0 +1,19 @@
+{
+  "file": "20-bag-oblong",
+  "version": "0.2.0",
+  "width": 1512,
+  "height": 2016,
+  "scene": "bag",
+  "detected": 59,
+  "counts": {
+    "A": 19,
+    "B": 59,
+    "C": 1
+  },
+  "diagnostics": [
+    "面積異常の再分割: 59 → 70",
+    "除外候補: A=48, B=72, C=111",
+    "Lab色差 Otsu=44.0",
+    "表示する検出集合: B"
+  ]
+}
