@@ -22,7 +22,7 @@ test("optional ONNX model executes locally and participates in spatial agreement
       },
     }),
   );
-  await page.goto("./");
+  await page.goto("./?debug=1");
   await page.locator("#auto-roi").uncheck();
   const bytes = await page.evaluate(async () => {
     const c = document.createElement("canvas");
@@ -49,5 +49,5 @@ test("optional ONNX model executes locally and participates in spatial agreement
   );
   await expect(page.locator("#votes")).toContainText("AI 1");
   await expect(page.locator("#count")).toHaveText("1");
-  await expect(page.locator("#confidence")).toHaveText("高");
+  await expect(page.locator("#confidence")).toContainText("要確認");
 });

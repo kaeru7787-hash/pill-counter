@@ -4,6 +4,12 @@ import { readFile } from "node:fs/promises";
 import { resolve, extname, sep } from "node:path";
 import sharp from "sharp";
 import { positionMetrics } from "../../src/vision/positionMetrics";
+
+// These exercise the CV fallback and editing UI. Real hybrid inference has its
+// own suite so this regression suite remains deterministic and offline.
+test.beforeEach(async ({ context }) => {
+  await context.addInitScript(() => localStorage.setItem("pill-ai-enabled", "false"));
+});
 test("JPEG EXIF orientation is applied before overlay coordinates", async ({
   page,
 }) => {
@@ -11,7 +17,7 @@ test("JPEG EXIF orientation is applied before overlay coordinates", async ({
     .jpeg()
     .withMetadata({ orientation: 6 })
     .toBuffer();
-  await page.goto("./");
+  await page.goto("./?debug=1");
   await page.locator("#file").setInputFiles({
     name: "oriented.jpg",
     mimeType: "image/jpeg",
@@ -35,7 +41,7 @@ test("camera controls, analysis, numbering, corrections, ROI, debug and local ex
     )
       outgoing.push(r.url());
   });
-  await page.goto("./");
+  await page.goto("./?debug=1");
   await expect(page.locator("#camera")).toHaveAttribute(
     "capture",
     "environment",
@@ -181,7 +187,7 @@ test("real tray: 90 spatially supported detections, debug layers and batch corre
   page,
 }) => {
   test.setTimeout(120000);
-  await page.goto("./");
+  await page.goto("./?debug=1");
   await page.locator("#debug").check();
   await page.locator("#file").setInputFiles("tests/images/18-real-tray.jpg");
   await expect(page.locator("#status")).toContainText("解析完了", {
@@ -237,7 +243,7 @@ test("colored tablets in bags and trays: positions and counts survive browser de
     ["21-yellow-tray-round.png", 12],
     ["22-yellow-tray-oblong.png", 36],
   ] as const) {
-    await page.goto("./");
+    await page.goto("./?debug=1");
     await page.locator("#file").setInputFiles("tests/images/" + file);
     await expect(page.locator("#status")).toContainText("解析完了", {
       timeout: 90000,
@@ -282,4 +288,29 @@ test("colored tablets in bags and trays: positions and counts survive browser de
       fullPage: true,
     });
   }
+});
+
+test("normal screen has only counting controls; developer panels are absent from view", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(page.getByRole("heading", { name: "解析設定" })).toBeHidden();
+  await expect(page.getByRole("heading", { name: "検証データ" })).toBeHidden();
+  await expect(page.locator("#camera")).toHaveAttribute(
+    "capture",
+    "environment",
+  );
+  await page
+    .locator("#file")
+    .setInputFiles("tests/images/21-yellow-tray-round.png");
+  await expect(page.locator("#status")).toContainText("解析完了", {
+    timeout: 60000,
+  });
+  await expect(page.locator("#count")).toHaveText("12");
+  await expect(page.locator("#votes")).toBeHidden();
+  await page.locator('[data-mode="delete"]').click();
+  await page.screenshot({
+    path: `tests/reports/simple-${test.info().project.name}.png`,
+    fullPage: true,
+  });
 });
