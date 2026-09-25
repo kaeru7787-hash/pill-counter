@@ -227,13 +227,15 @@ test("real tray: 90 spatially supported detections, debug layers and batch corre
   });
 });
 
-test("colored tablets in reflective bags: real positions and counts survive browser decoding", async ({
+test("colored tablets in bags and trays: positions and counts survive browser decoding", async ({
   page,
 }) => {
-  test.setTimeout(180000);
+  test.setTimeout(300000);
   for (const [file, count] of [
     ["19-bag-round.jpg", 12],
     ["20-bag-oblong.jpg", 36],
+    ["21-yellow-tray-round.png", 12],
+    ["22-yellow-tray-oblong.png", 36],
   ] as const) {
     await page.goto("./");
     await page.locator("#file").setInputFiles("tests/images/" + file);
@@ -255,7 +257,7 @@ test("colored tablets in reflective bags: real positions and counts survive brow
     );
     const annotation = JSON.parse(
       await readFile(
-        "tests/annotations/" + file.replace(".jpg", ".json"),
+        "tests/annotations/" + file.replace(/\.[^.]+$/, ".json"),
         "utf8",
       ),
     );
