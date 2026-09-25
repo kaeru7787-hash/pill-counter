@@ -231,3 +231,32 @@ test("real tray is scale-stable and manual ROI debug retains image coordinates",
     ),
   );
 });
+
+test("colored pills respect a manual ROI and expose full-resolution debug layers", async () => {
+  const { data, info } = await sharp("tests/images/19-bag-round.jpg")
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const roi = { x: 380, y: 950, width: 490, height: 380 };
+  const r = await analyze(
+    {
+      width: info.width,
+      height: info.height,
+      data: new Uint8ClampedArray(data),
+    },
+    { scene: "tray", autoROI: false, debug: true, roi },
+  );
+  assert.equal(r.detections.length, 12);
+  assert.ok(r.algorithm?.includes("回転形状"));
+  assert.equal(r.debug.Markers.width, info.width);
+  assert.equal(r.debug.Watershed.height, info.height);
+  assert.ok(
+    r.detections.every(
+      (d) =>
+        d.center.x >= roi.x &&
+        d.center.y >= roi.y &&
+        d.center.x < roi.x + roi.width &&
+        d.center.y < roi.y + roi.height,
+    ),
+  );
+});

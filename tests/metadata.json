@@ -1262,5 +1262,15 @@
     "scene": "tray",
     "category": "Merged pills / Background",
     "autoROI": true
+  },
+  "19-bag-round.jpg": {
+    "kind": "real",
+    "scene": "bag",
+    "category": "Bag artifact / Merged pills"
+  },
+  "20-bag-oblong.jpg": {
+    "kind": "real",
+    "scene": "bag",
+    "category": "Bag artifact / Merged pills / Split pill"
   }
 }
