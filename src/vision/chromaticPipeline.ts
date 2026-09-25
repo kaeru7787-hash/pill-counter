@@ -49,6 +49,7 @@ const conflict = (a: Model, b: Model) =>
 export async function analyzeChromatic(
   image: Raster,
   settings: Settings,
+  brightOnly = false,
 ): Promise<Analysis | undefined> {
   const start = performance.now(),
     { cv } = await getCV(),
@@ -74,6 +75,19 @@ export async function analyzeChromatic(
       smooth = mat();
     cv.cvtColor(rgb, gray, cv.COLOR_RGB2GRAY);
     cv.cvtColor(rgb, hsv, cv.COLOR_RGB2HSV);
+    const brightMask = mat();
+    const brightOtsu = brightOnly
+      ? cv.threshold(
+          gray,
+          brightMask,
+          0,
+          255,
+          cv.THRESH_BINARY | cv.THRESH_OTSU,
+        )
+      : 0;
+    const brightThreshold = brightOnly
+      ? brightOtsu + 0.3 * (cv.minMaxLoc(gray, brightMask).maxVal - brightOtsu)
+      : 0;
     const roi = settings.roi || {
       x: 0,
       y: 0,
@@ -90,7 +104,10 @@ export async function analyzeChromatic(
             y / scale >= roi.y &&
             x / scale < roi.x + roi.width &&
             y / scale < roi.y + roi.height;
-        sat.data[i] = within ? hsv.data[i * 3 + 1] : 0;
+        sat.data[i] =
+          within && (!brightOnly || gray.data[i] > brightThreshold)
+            ? hsv.data[i * 3 + 1]
+            : 0;
         if (within && i % 5 === 0) {
           n++;
           if (sat.data[i] < 60) {
@@ -99,7 +116,8 @@ export async function analyzeChromatic(
         }
       }
     // Require neutral background evidence; do not assume that the selected scene is correct.
-    if (neutral / Math.max(1, n) < 0.25) return undefined;
+    if (neutral / Math.max(1, n) < 0.25)
+      return brightOnly ? undefined : analyzeChromatic(image, settings, true);
     const otsu = cv.threshold(
       sat,
       mask,
@@ -107,7 +125,7 @@ export async function analyzeChromatic(
       255,
       cv.THRESH_BINARY | cv.THRESH_OTSU,
     );
-    if (otsu < 70) return undefined;
+    if (otsu < (brightOnly ? 20 : 70)) return undefined;
     let hueX = 0,
       hueY = 0,
       hueN = 0;
@@ -235,7 +253,8 @@ export async function analyzeChromatic(
                 if (
                   score < 15 ||
                   !mask.data[cy * w + cx] ||
-                  colors[(cy * w + cx) * 3 + 1] < Math.max(threshold, 102)
+                  colors[(cy * w + cx) * 3 + 1] <
+                    Math.max(threshold, brightOnly ? 0 : 102)
                 )
                   continue;
                 let peak = true;
@@ -275,7 +294,7 @@ export async function analyzeChromatic(
             n++;
             if (
               sat.data[Math.round(y) * w + Math.round(x)] >
-              Math.max(threshold * 0.85, 102)
+              Math.max(threshold * 0.85, brightOnly ? 0 : 102)
             )
               good++;
           }
@@ -380,7 +399,12 @@ export async function analyzeChromatic(
           y >= roi.y &&
           x < roi.x + roi.width &&
           y < roi.y + roi.height &&
-          fullHSV.data[i * 3 + 1] > threshold
+          fullHSV.data[i * 3 + 1] > threshold &&
+          (!brightOnly ||
+            0.299 * rgbFull.data[i * 3] +
+              0.587 * rgbFull.data[i * 3 + 1] +
+              0.114 * rgbFull.data[i * 3 + 2] >
+              brightThreshold)
             ? 255
             : 0;
       }
@@ -598,7 +622,7 @@ export async function analyzeChromatic(
       },
       debug,
       diagnostics: [
-        `彩度 Otsu=${otsu.toFixed(1)}`,
+        `彩度 Otsu=${otsu.toFixed(1)} / 明度支持=${brightOnly ? brightThreshold.toFixed(1) : "なし"}`,
         `推定半径 ${(radius / scale).toFixed(1)}px / 形状評価 ${strength(round).toFixed(1)} / ${strength(long).toFixed(1)} / 形状 ${elongated ? "長円形" : "丸形"}`,
         `長軸 ${length.toFixed(1)} / 色領域 ${substantial.length} / 形状候補 ${kept.length} / 断片統合 ${fragmentMerges} / 採用 ${detections.length}`,
         `輪郭の精密化は ${image.width}×${image.height}、形状探索は ${w}×${h}`,
