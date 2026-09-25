@@ -3,9 +3,10 @@ import { automaticROI, median, preprocess } from "./preprocess";
 import { segment } from "./segmentation";
 import { contours, relativeFilter } from "./shapeFilter";
 import { splitWatershed } from "./watershed";
+import { analyzeTray } from "./trayPipeline";
 import { confidence, spatialAgreement, chooseDetections } from "./ensemble";
 import type { Analysis, DebugImage, Raster, Settings, ROI } from "../types";
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";
 export function clampROI(roi: ROI, w: number, h: number): ROI {
   const x = Math.max(0, Math.min(w - 3, Math.floor(roi.x))),
     y = Math.max(0, Math.min(h - 3, Math.floor(roi.y)));
@@ -20,9 +21,13 @@ export async function analyze(
   image: Raster,
   settings: Settings,
 ): Promise<Analysis> {
+  if (settings.scene === "tray") {
+    const tray = await analyzeTray(image, settings);
+    if (tray) return tray;
+  }
   const start = performance.now(),
     { cv } = await getCV(),
-    rgb = preprocess(cv, image),
+    rgb = preprocess(cv, image, settings.parameters?.blur),
     full = { x: 0, y: 0, width: image.width, height: image.height };
   const roi = clampROI(
     settings.roi ||
@@ -37,14 +42,16 @@ export async function analyze(
     crop = view.clone();
   view.delete();
   rgb.delete();
-  const primary = segment(cv, crop, 1),
-    alternate = segment(cv, crop, 0.86),
+  const primary = segment(cv, crop, 1, settings.parameters),
+    alternate = segment(cv, crop, 0.86, settings.parameters),
     issues: string[] = [],
     diagnostics: string[] = [];
   const a = relativeFilter(contours(cv, primary.mask, "a", roi));
-  // Remove only relative-area/shape rejects before watershed; preserve plausible different sizes.
+  // Preserve dense clusters until after splitting; remove only background enclosures.
   const clean = cv.Mat.zeros(crop.rows, crop.cols, cv.CV_8UC1);
-  for (const d of a.kept) {
+  for (const d of contours(cv, primary.mask, "raw", roi).filter(
+    (d) => !d.flags.includes("背景の囲み枠"),
+  )) {
     const pts = cv.matFromArray(
       d.contour.length,
       1,
@@ -58,10 +65,36 @@ export async function analyze(
     pts.delete();
   }
   cv.bitwise_and(clean, primary.mask, clean);
-  const split = splitWatershed(cv, clean, roi),
-    alt = splitWatershed(cv, alternate.mask, roi, 1.06);
-  const b = relativeFilter(split.detections),
-    c = relativeFilter(alt.detections);
+  const split = splitWatershed(
+      cv,
+      clean,
+      roi,
+      settings.parameters?.minimumDistance ?? 1,
+    ),
+    alt = splitWatershed(
+      cv,
+      alternate.mask,
+      roi,
+      (settings.parameters?.minimumDistance ?? 1) * 1.06,
+    );
+  const filter = (list: import("../types").Detection[]) => {
+    const filtered = relativeFilter(list),
+      p = settings.parameters || {};
+    const reference = p.diameter
+      ? Math.PI * (p.diameter / 2) ** 2
+      : median(filtered.kept.map((d) => d.area));
+    const kept = filtered.kept.filter(
+      (d) =>
+        (p.minArea === undefined || d.area >= reference * p.minArea) &&
+        (p.maxArea === undefined || d.area <= reference * p.maxArea) &&
+        (p.minCircularity === undefined ||
+          d.shape!.circularity >= p.minCircularity) &&
+        (p.minSolidity === undefined || d.shape!.solidity >= p.minSolidity),
+    );
+    return { ...filtered, kept, rejected: list.length - kept.length };
+  };
+  const b = filter(split.detections),
+    c = filter(alt.detections);
   const areas = b.kept.map((d) => d.area),
     med = median(areas);
   // Re-run suspicious large regions at a closer peak spacing. Never invent seeds from area alone.
@@ -78,6 +111,7 @@ export async function analyze(
     }
     retry.distance.delete();
     retry.markers.delete();
+    retry.seedsImage.delete();
   }
   if (settings.scene === "bag")
     issues.push("透明袋：反射・印字・溶着部の目視確認が必要");
@@ -142,7 +176,14 @@ export async function analyze(
       return { width: crop.cols, height: crop.rows, data: out };
     };
     debug["Foreground mask"] = raster(clean.data, "gray");
-    debug["Threshold"] = raster(primary.mask.data, "gray");
+    debug["Threshold"] = raster(primary.threshold.data, "gray");
+    debug.Morphology = raster(primary.mask.data, "gray");
+    debug.Markers = raster(split.seedsImage.data32S, "labels");
+    const gray = new cv.Mat();
+    cv.cvtColor(crop, gray, cv.COLOR_RGB2GRAY);
+    debug.Grayscale = raster(gray.data, "gray");
+    gray.delete();
+    debug.ROI = raster(new Uint8Array(crop.rows * crop.cols).fill(255), "gray");
     debug["Distance transform"] = raster(split.distance.data32F, "distance");
     debug["Watershed"] = raster(split.markers.data32S, "labels");
   }
@@ -159,20 +200,26 @@ export async function analyze(
     .map((d, i) => ({ ...d, id: `cv-${i + 1}` }));
   crop.delete();
   primary.mask.delete();
+  primary.threshold.delete();
   primary.difference.delete();
   alternate.mask.delete();
+  alternate.threshold.delete();
   alternate.difference.delete();
   clean.delete();
   split.distance.delete();
   split.markers.delete();
   alt.distance.delete();
   alt.markers.delete();
+  alt.seedsImage.delete();
+  split.seedsImage.delete();
   return {
     version: VERSION,
     width: image.width,
     height: image.height,
     roi,
     detections,
+    candidates: a.kept,
+    algorithm: "Lab色差 + 輪郭 + 距離ピーク/Watershed（非円形対応）",
     counts,
     confidence: confidence(counts, agreement, issues),
     debug,

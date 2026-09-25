@@ -1,6 +1,12 @@
 import type { CV } from "./opencv";
 import { median } from "./preprocess";
-export function segment(cv: CV, rgb: InstanceType<CV["Mat"]>, variant = 1) {
+import type { Parameters } from "../types";
+export function segment(
+  cv: CV,
+  rgb: InstanceType<CV["Mat"]>,
+  variant = 1,
+  parameters: Parameters = {},
+) {
   const lab = new cv.Mat(),
     gray = new cv.Mat(),
     local = new cv.Mat(),
@@ -51,11 +57,15 @@ export function segment(cv: CV, rgb: InstanceType<CV["Mat"]>, variant = 1) {
   cv.threshold(
     difference,
     mask,
-    Math.max(8, otsu * variant),
+    Math.max(8, (parameters.threshold ?? otsu) * variant),
     255,
     cv.THRESH_BINARY,
   );
-  let block = Math.max(3, Math.round(Math.min(rgb.rows, rgb.cols) * 0.055) | 1);
+  let block = Math.max(
+    3,
+    Math.round(parameters.blockSize ?? Math.min(rgb.rows, rgb.cols) * 0.055) |
+      1,
+  );
   cv.adaptiveThreshold(
     gray,
     local,
@@ -71,7 +81,11 @@ export function segment(cv: CV, rgb: InstanceType<CV["Mat"]>, variant = 1) {
   for (let p = 0; p < maskPixels.length; p++)
     if (maskPixels[p] && diffPixels[p] < otsu * 1.15 && !localPixels[p])
       maskPixels[p] = 0;
-  const radius = Math.max(1, Math.round(Math.min(rgb.rows, rgb.cols) / 700));
+  const radius = Math.max(
+    1,
+    Math.round(parameters.morphology ?? Math.min(rgb.rows, rgb.cols) / 700),
+  );
+  const threshold = mask.clone();
   const kernel = cv.getStructuringElement(
     cv.MORPH_ELLIPSE,
     new cv.Size(radius * 2 + 1, radius * 2 + 1),
@@ -112,5 +126,5 @@ export function segment(cv: CV, rgb: InstanceType<CV["Mat"]>, variant = 1) {
   lab.delete();
   gray.delete();
   local.delete();
-  return { mask, difference, otsu, background: bg };
+  return { mask, threshold, difference, otsu, background: bg };
 }

@@ -71,6 +71,7 @@ export function contours(
         contour: points,
         source: "cv",
         flags,
+        shape: { circularity: roundness, solidity, aspect, perimeter },
       });
     } finally {
       c.delete();

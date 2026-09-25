@@ -4,7 +4,7 @@ export const median = (values: number[]) => {
   const s = [...values].sort((a, b) => a - b);
   return s.length ? s[Math.floor(s.length / 2)] : 0;
 };
-export function preprocess(cv: CV, image: Raster) {
+export function preprocess(cv: CV, image: Raster, blur = 3) {
   const src = cv.matFromImageData(image as ImageData),
     rgb = new cv.Mat(),
     smooth = new cv.Mat();
@@ -32,7 +32,8 @@ export function preprocess(cv: CV, image: Raster) {
     for (let i = 0; i < pixels.length; i++)
       pixels[i] = Math.min(255, pixels[i] * gains[i % 3]);
   }
-  cv.GaussianBlur(rgb, smooth, new cv.Size(3, 3), 0);
+  const kernel = Math.max(1, Math.round(blur)) | 1;
+  cv.GaussianBlur(rgb, smooth, new cv.Size(kernel, kernel), 0);
   rgb.delete();
   return smooth;
 }
@@ -67,7 +68,10 @@ export function automaticROI(
         h > rgb.rows * 0.5 &&
         area / (w * h) > 0.45
       ) {
-        const inset = Math.max(2, Math.round(Math.min(w, h) * 0.018));
+        const inset =
+          w >= rgb.cols * 0.95 && h >= rgb.rows * 0.95
+            ? 0
+            : Math.max(2, Math.round(Math.min(w, h) * 0.018));
         best = {
           x: x + inset,
           y: y + inset,
