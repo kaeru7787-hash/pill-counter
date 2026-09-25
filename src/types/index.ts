@@ -9,6 +9,7 @@ export type Detection = {
   source: "cv" | "ai" | "manual";
   flags: string[];
   group?: string;
+  score?: number;
   shape?: {
     circularity: number;
     solidity: number;
@@ -35,6 +36,7 @@ export type Settings = {
   scene: "tray" | "desk" | "bag";
   autoROI: boolean;
   debug: boolean;
+  useAI?: boolean;
   roi?: ROI;
   parameters?: Parameters;
 };
