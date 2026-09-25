@@ -9,15 +9,38 @@ export type Detection = {
   source: "cv" | "ai" | "manual";
   flags: string[];
   group?: string;
+  shape?: {
+    circularity: number;
+    solidity: number;
+    aspect: number;
+    perimeter: number;
+  };
+};
+export type Parameters = {
+  threshold?: number;
+  blockSize?: number;
+  blur?: number;
+  morphology?: number;
+  minArea?: number;
+  maxArea?: number;
+  minCircularity?: number;
+  minSolidity?: number;
+  minimumDistance?: number;
+  diameter?: number;
+  houghMin?: number;
+  houghMax?: number;
+  houghSensitivity?: number;
 };
 export type Settings = {
   scene: "tray" | "desk" | "bag";
   autoROI: boolean;
   debug: boolean;
   roi?: ROI;
+  parameters?: Parameters;
 };
 export type Raster = { width: number; height: number; data: Uint8ClampedArray };
 export type DebugImage = {
+  origin?: Point;
   width: number;
   height: number;
   data: Uint8ClampedArray;
@@ -38,6 +61,9 @@ export type Analysis = {
   diagnostics: string[];
   elapsed: number;
   aiStatus?: string;
+  algorithm?: string;
+  estimatedDiameter?: number;
+  candidates?: Detection[];
 };
 export type WorkerRequest = {
   id: number;
