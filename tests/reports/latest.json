@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-09-24T09:40:45.234Z",
-  "scope": "Synthetic fixtures are not evidence of clinical or real-photo accuracy.",
+  "generatedAt": "2026-09-25T00:20:39.708Z",
+  "scope": "One development real image plus synthetic regression fixtures. Not an independent clinical validation set.",
   "metrics": {
-    "images": 17,
+    "images": 18,
     "exactCountAccuracy": 1,
     "meanAbsoluteError": 0,
     "meanAbsolutePercentageError": 0,
@@ -17,6 +17,14 @@
       "meanAbsolutePercentageError": 0,
       "withinOneAccuracy": 1,
       "mapeExcludedZeroTruth": 1
+    },
+    "real": {
+      "images": 1,
+      "exactCountAccuracy": 1,
+      "meanAbsoluteError": 0,
+      "meanAbsolutePercentageError": 0,
+      "withinOneAccuracy": 1,
+      "mapeExcludedZeroTruth": 0
     }
   },
   "rows": [
@@ -38,7 +46,8 @@
       "reasons": [
         "画像処理の結果は安定。AIによる独立照合は未実施",
         "信頼度は一致度の目安です。実写精度は未検証です"
-      ]
+      ],
+      "absoluteCountError": 0
     },
     {
       "file": "02-yellow-oval.png",
@@ -47,7 +56,7 @@
       "predicted": 15,
       "error": 0,
       "absolutePercentageError": 0,
-      "confidence": "medium",
+      "confidence": "review",
       "counts": {
         "A": 15,
         "B": 15,
@@ -56,9 +65,9 @@
       "category": "None",
       "notes": "",
       "reasons": [
-        "画像処理の結果は安定。AIによる独立照合は未実施",
-        "信頼度は一致度の目安です。実写精度は未検証です"
-      ]
+        "自動解析範囲を確認してください"
+      ],
+      "absoluteCountError": 0
     },
     {
       "file": "03-capsules.png",
@@ -67,7 +76,7 @@
       "predicted": 12,
       "error": 0,
       "absolutePercentageError": 0,
-      "confidence": "medium",
+      "confidence": "review",
       "counts": {
         "A": 12,
         "B": 12,
@@ -76,9 +85,9 @@
       "category": "None",
       "notes": "",
       "reasons": [
-        "画像処理の結果は安定。AIによる独立照合は未実施",
-        "信頼度は一致度の目安です。実写精度は未検証です"
-      ]
+        "自動解析範囲を確認してください"
+      ],
+      "absoluteCountError": 0
     },
     {
       "file": "04-touching-pairs.png",
@@ -96,9 +105,11 @@
       "category": "None",
       "notes": "",
       "reasons": [
+        "自動解析範囲を確認してください",
         "接触または不規則な形状を検出しました",
         "解析方法の個数が不一致（差 2）"
-      ]
+      ],
+      "absoluteCountError": 0
     },
     {
       "file": "05-touching-three.png",
@@ -116,9 +127,11 @@
       "category": "None",
       "notes": "",
       "reasons": [
+        "自動解析範囲を確認してください",
         "接触または不規則な形状を検出しました",
         "解析方法の個数が不一致（差 2）"
-      ]
+      ],
+      "absoluteCountError": 0
     },
     {
       "file": "06-mixed-sizes.png",
@@ -136,8 +149,10 @@
       "category": "None",
       "notes": "",
       "reasons": [
+        "自動解析範囲を確認してください",
         "面積分布に大きな候補：大型錠剤または接触の可能性"
-      ]
+      ],
+      "absoluteCountError": 0
     },
     {
       "file": "07-scored-tablets.png",
@@ -157,7 +172,8 @@
       "reasons": [
         "画像処理の結果は安定。AIによる独立照合は未実施",
         "信頼度は一致度の目安です。実写精度は未検証です"
-      ]
+      ],
+      "absoluteCountError": 0
     },
     {
       "file": "08-tray-rim.png",
@@ -177,7 +193,8 @@
       "reasons": [
         "画像処理の結果は安定。AIによる独立照合は未実施",
         "信頼度は一致度の目安です。実写精度は未検証です"
-      ]
+      ],
+      "absoluteCountError": 0
     },
     {
       "file": "09-bag-artifacts.png",
@@ -196,7 +213,8 @@
       "notes": "",
       "reasons": [
         "透明袋：反射・印字・溶着部の目視確認が必要"
-      ]
+      ],
+      "absoluteCountError": 0
     },
     {
       "file": "10-desk-color.png",
@@ -216,7 +234,8 @@
       "reasons": [
         "画像処理の結果は安定。AIによる独立照合は未実施",
         "信頼度は一致度の目安です。実写精度は未検証です"
-      ]
+      ],
+      "absoluteCountError": 0
     },
     {
       "file": "11-specks.png",
@@ -236,7 +255,8 @@
       "reasons": [
         "画像処理の結果は安定。AIによる独立照合は未実施",
         "信頼度は一致度の目安です。実写精度は未検証です"
-      ]
+      ],
+      "absoluteCountError": 0
     },
     {
       "file": "12-shadow.png",
@@ -256,7 +276,8 @@
       "reasons": [
         "画像処理の結果は安定。AIによる独立照合は未実施",
         "信頼度は一致度の目安です。実写精度は未検証です"
-      ]
+      ],
+      "absoluteCountError": 0
     },
     {
       "file": "13-empty.png",
@@ -274,9 +295,11 @@
       "category": "None",
       "notes": "",
       "reasons": [
+        "自動解析範囲を確認してください",
         "背景との色差が小さい",
         "錠剤候補を検出できませんでした"
-      ]
+      ],
+      "absoluteCountError": 0
     },
     {
       "file": "14-dense-90.png",
@@ -296,7 +319,8 @@
       "reasons": [
         "画像処理の結果は安定。AIによる独立照合は未実施",
         "信頼度は一致度の目安です。実写精度は未検証です"
-      ]
+      ],
+      "absoluteCountError": 0
     },
     {
       "file": "15-edge-cut.png",
@@ -314,8 +338,10 @@
       "category": "None",
       "notes": "",
       "reasons": [
+        "自動解析範囲を確認してください",
         "形状または境界に不確かな候補があります"
-      ]
+      ],
+      "absoluteCountError": 0
     },
     {
       "file": "16-low-contrast.png",
@@ -335,7 +361,8 @@
       "reasons": [
         "画像処理の結果は安定。AIによる独立照合は未実施",
         "信頼度は一致度の目安です。実写精度は未検証です"
-      ]
+      ],
+      "absoluteCountError": 0
     },
     {
       "file": "17-white-reflection.png",
@@ -355,7 +382,130 @@
       "reasons": [
         "透明袋：反射・印字・溶着部の目視確認が必要",
         "白飛びが多く、反射と錠剤の区別が不安定"
-      ]
+      ],
+      "absoluteCountError": 0
+    },
+    {
+      "file": "18-real-tray.jpg",
+      "kind": "real",
+      "truth": 90,
+      "predicted": 90,
+      "error": 0,
+      "absolutePercentageError": 0,
+      "confidence": "review",
+      "counts": {
+        "A": 4,
+        "B": 90,
+        "C": 62
+      },
+      "category": "None",
+      "notes": "",
+      "reasons": [
+        "解析方法の個数が不一致（差 86）",
+        "解析条件によって検出位置が変化"
+      ],
+      "absoluteCountError": 0,
+      "position": {
+        "tp": 90,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1,
+        "matchedPredictions": [
+          3,
+          1,
+          2,
+          5,
+          11,
+          9,
+          12,
+          13,
+          15,
+          16,
+          20,
+          22,
+          23,
+          26,
+          25,
+          27,
+          35,
+          31,
+          29,
+          33,
+          41,
+          46,
+          47,
+          53,
+          52,
+          51,
+          58,
+          59,
+          64,
+          65,
+          62,
+          68,
+          72,
+          73,
+          76,
+          81,
+          80,
+          87,
+          82,
+          89,
+          0,
+          4,
+          6,
+          7,
+          8,
+          10,
+          14,
+          17,
+          18,
+          19,
+          21,
+          24,
+          28,
+          30,
+          32,
+          34,
+          36,
+          38,
+          37,
+          39,
+          40,
+          42,
+          43,
+          44,
+          45,
+          48,
+          49,
+          50,
+          54,
+          55,
+          57,
+          56,
+          61,
+          63,
+          60,
+          67,
+          66,
+          69,
+          70,
+          71,
+          74,
+          75,
+          77,
+          78,
+          79,
+          84,
+          83,
+          86,
+          85,
+          88
+        ],
+        "missingTruth": []
+      }
     }
   ]
 }
