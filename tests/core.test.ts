@@ -85,6 +85,32 @@ test("YOLO boxes undo letterboxing, apply NMS and validate shape", () => {
     }),
   );
 });
+test("AI excludes foreign objects by winning class before NMS", () => {
+  // Do not relabel a foreign object as a pill using its secondary class score.
+  const data = new Float32Array([
+    100, 110, 100, 100, 60, 60, 60, 60, 0.6, 0.9, 0.95, 0.1,
+  ]);
+  const ds = decodeYolo(
+    data,
+    [1, 6, 2],
+    {
+      format: "yolov8-detect",
+      inputSize: 640,
+      classes: 2,
+      allowedClasses: [0],
+      scoreThreshold: 0.5,
+      iouThreshold: 0.45,
+    },
+    1,
+    0,
+    0,
+    { x: 0, y: 0, width: 640, height: 640 },
+  );
+  assert.equal(ds.length, 1);
+  assert.equal(ds[0].center.x, 110);
+  assert.equal(ds[0].group, "class-0");
+});
+
 test("separated white tablets have numbered contour candidates", async () => {
   const r = await analyze(fixture("01-white-separated"), {
     scene: "tray",
