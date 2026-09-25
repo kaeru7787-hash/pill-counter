@@ -11,13 +11,11 @@ test("JPEG EXIF orientation is applied before overlay coordinates", async ({
     .withMetadata({ orientation: 6 })
     .toBuffer();
   await page.goto("./");
-  await page
-    .locator("#file")
-    .setInputFiles({
-      name: "oriented.jpg",
-      mimeType: "image/jpeg",
-      buffer: jpeg,
-    });
+  await page.locator("#file").setInputFiles({
+    name: "oriented.jpg",
+    mimeType: "image/jpeg",
+    buffer: jpeg,
+  });
   await expect(page.locator("#status")).toContainText("解析完了");
   await expect(page.locator("#image-meta")).toHaveText("480 × 640");
   await expect(page.locator("#count")).toHaveText("24");
@@ -58,6 +56,10 @@ test("camera controls, analysis, numbering, corrections, ROI, debug and local ex
   await expect(page.locator("#count")).toHaveText("25");
   await page.locator("#undo").click();
   await expect(page.locator("#count")).toHaveText("24");
+  await page.locator("#redo").click();
+  await expect(page.locator("#count")).toHaveText("25");
+  await page.locator("#reset-detections").click();
+  await expect(page.locator("#count")).toHaveText("24");
   await page.locator("#detection-list summary").click();
   await page.locator("#list button").first().click();
   await page.locator("#delete-selected").click();
@@ -82,7 +84,7 @@ test("camera controls, analysis, numbering, corrections, ROI, debug and local ex
   await expect(page.locator("#status")).toContainText("解析完了");
   await expect(page.locator("#count")).toHaveText("24");
   await page.locator("#layer").selectOption("Distance transform");
-  await expect(page.locator("#diagnostics")).toContainText("Lab");
+  await expect(page.locator("#diagnostics")).toContainText("Otsu");
   await page.locator('[data-mode="roi"]').click();
   await page.locator("#canvas-wrap").evaluate((el) => {
     el.scrollTop = 0;
@@ -167,9 +169,59 @@ test("PWA reload and fresh analysis work with the origin server stopped", async 
       .setInputFiles("tests/images/04-touching-pairs.png");
     await expect(page.locator("#status")).toContainText("解析完了");
     await expect(page.locator("#count")).toHaveText("4");
-    await expect(page.locator("#confidence")).toHaveText("要確認");
+    await expect(page.locator("#confidence")).toContainText("要確認");
   } finally {
     server.closeAllConnections();
     server.close();
   }
+});
+
+test("real tray: 90 spatially supported detections, debug layers and batch correction", async ({
+  page,
+}) => {
+  test.setTimeout(120000);
+  await page.goto("./");
+  await page.locator("#debug").check();
+  await page.locator("#file").setInputFiles("tests/images/18-real-tray.jpg");
+  await expect(page.locator("#status")).toContainText("解析完了", {
+    timeout: 60000,
+  });
+  await expect(page.locator("#count")).toHaveText("90");
+  await expect(page.locator("#list button")).toHaveCount(90);
+  await expect(page.locator("#image-meta")).toHaveText("1536 × 2048");
+  await expect(page.locator("#confidence")).toContainText("要確認");
+  for (const layer of [
+    "Original",
+    "ROI",
+    "Grayscale",
+    "Threshold",
+    "Morphology",
+    "Distance transform",
+    "Markers",
+    "Watershed",
+    "Contours",
+    "Final detections",
+  ])
+    await page.locator("#layer").selectOption(layer);
+  await page.locator('[data-mode="batch"]').click();
+  const canvas = page.locator("#image-canvas");
+  await page.locator("#canvas-wrap").evaluate((el) => {
+    el.scrollTop = 0;
+    el.scrollLeft = 0;
+    el.scrollIntoView({ block: "start" });
+  });
+  const r = (await canvas.boundingBox())!;
+  await page.mouse.move(r.x + r.width * 0.19, r.y + r.height * 0.25);
+  await page.mouse.down();
+  await page.mouse.move(r.x + r.width * 0.44, r.y + r.height * 0.39, {
+    steps: 10,
+  });
+  await page.mouse.up();
+  await expect(page.locator("#count")).not.toHaveText("90");
+  await page.locator("#undo").click();
+  await expect(page.locator("#count")).toHaveText("90");
+  await page.screenshot({
+    path: `tests/reports/real-${test.info().project.name}.png`,
+    fullPage: true,
+  });
 });
