@@ -1,5 +1,10 @@
 // Trial hybrid fusion. No ground truth enters this function.
-import type { Detection } from "../types";
+import type { Detection, Raster } from "../types";
+import {
+  referenceProfile,
+  anomalyReasons,
+  associated,
+} from "./candidateReview";
 import type { AICandidate } from "./onnxDetector";
 import { iou } from "./onnxDetector";
 export function sameObject(a: Detection, b: Detection) {
@@ -13,6 +18,7 @@ export function fuse(
   cv: Detection[],
   full: AICandidate[],
   tiles: AICandidate[],
+  image?: Raster,
 ) {
   const ai = [...full, ...tiles],
     stable: AICandidate[] = [];
@@ -23,13 +29,34 @@ export function fuse(
     )
     .sort((a, b) => b.score - a.score))
     if (!stable.some((b) => sameObject(a, b))) stable.push(a);
-  const areas = cv.map((d) => d.area).sort((a, b) => a - b),
+  const profile = referenceProfile(cv, stable, image);
+  const rejected: Detection[] = [];
+  const accepted = cv.filter((c) => {
+    if (stable.some((a) => associated(c, a))) return true;
+    const reasons = anomalyReasons(c, profile, image);
+    const tiny =
+      profile.ready && profile.uniform && c.area < profile.area * 0.18;
+    if (reasons.length >= 2 || tiny) {
+      rejected.push({
+        ...c,
+        flags: [
+          ...c.flags,
+          ...reasons,
+          ...(tiny ? ["錠剤群に比べ極端に小さい"] : []),
+          "AIの位置支持なし",
+        ],
+      });
+      return false;
+    }
+    return true;
+  });
+  const areas = accepted.map((d) => d.area).sort((a, b) => a - b),
     median = areas[Math.floor(areas.length / 2)] || 0;
   // Associate fragments with the independently supported object's box scale.
   // A fragment's foreground area shrinks under glare and cannot define the
   // association radius. Each CV object belongs to at most one AI object.
   const groups = stable.map((): Detection[] => []);
-  for (const c of cv) {
+  for (const c of accepted) {
     const choices = stable
       .map((a, index) => ({
         index,
@@ -45,19 +72,23 @@ export function fuse(
   const removed: Detection[] = [],
     replaced: Detection[] = [],
     added: AICandidate[] = [];
-  const detections = [...cv];
+  const detections = [...accepted];
   for (const [index, a] of stable.entries()) {
     const group = groups[index];
     // Merge only a small split fragment and its partial parent, not two full
     // sized touching pills. Ambiguous groups remain available for review.
     if (
-      group.length === 2 &&
-      group.some((c) => c.area < median * 0.4) &&
-      group.some((c) => c.area >= median * 0.4) &&
-      group.reduce((s, c) => s + c.area, 0) < median * 1.2
+      group.length >= 2 &&
+      ((group.length === 2 &&
+        group.some((c) => c.area < median * 0.4) &&
+        group.some((c) => c.area >= median * 0.4) &&
+        group.reduce((s, c) => s + c.area, 0) < median * 1.2) ||
+        (profile.uniform &&
+          group.every((c) => c.area < profile.area * 0.55) &&
+          group.reduce((s, c) => s + c.area, 0) < a.area * 0.9))
     ) {
       const sorted = [...group].sort((b, c) => c.area - b.area);
-      removed.push(sorted[1]);
+      removed.push(...sorted.slice(1));
       replaced.push(sorted[0]);
       for (const c of group) detections.splice(detections.indexOf(c), 1);
       detections.push({
@@ -78,6 +109,9 @@ export function fuse(
     added,
     removed,
     replaced,
-    requiresReview: added.length > 0 || removed.length > 0,
+    rejected,
+    profile,
+    requiresReview:
+      added.length > 0 || removed.length > 0 || rejected.length > 0,
   };
 }
