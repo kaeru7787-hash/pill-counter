@@ -1,5 +1,8 @@
 import type { Raster } from "./types";
-export async function loadImage(file: Blob): Promise<{
+export async function loadImage(
+  file: Blob,
+  maxEdge = 2048,
+): Promise<{
   canvas: HTMLCanvasElement;
   image: Raster;
   originalWidth: number;
@@ -17,7 +20,8 @@ export async function loadImage(file: Blob): Promise<{
       throw new Error("画像サイズが不正です");
     const scale = Math.min(
       1,
-      1280 / Math.max(img.naturalWidth, img.naturalHeight),
+      maxEdge / Math.max(img.naturalWidth, img.naturalHeight),
+      Math.sqrt(6_000_000 / (img.naturalWidth * img.naturalHeight)),
     );
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(img.naturalWidth * scale);
