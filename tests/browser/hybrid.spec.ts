@@ -13,6 +13,11 @@ const cases = [
   ["24-lighting-bag-oblong.png", 36],
   ["25-lighting-bag-dense.png", 86],
   ["26-lighting-tray-dense.png", 86],
+  ["27-round-tray.png", 28],
+  ["28-round-bag.png", 28],
+  ["29-white-tray.png", 56],
+  ["30-white-bag.png", 56],
+  ["31-dense-tray.png", 70],
 ] as const;
 for (const [file, truth] of cases)
   test(`hybrid positions: ${file}`, async ({ page, context }) => {
@@ -29,7 +34,19 @@ for (const [file, truth] of cases)
     );
     await page.goto("./?debug=1");
     await expect(page.locator("#ai-enabled")).toBeChecked();
-    await page.locator("#file").setInputFiles("tests/images/" + file);
+    // Optional exact camera JPEGs exercise decoding/EXIF as well as inference.
+    const jpeg =
+      process.env.PILL_ORIGINALS &&
+      `${process.env.PILL_ORIGINALS}/${file.replace(/\.png$/, ".jpeg")}`;
+    if (jpeg && existsSync(jpeg))
+      await page
+        .locator("#file")
+        .setInputFiles({
+          name: file,
+          mimeType: "image/jpeg",
+          buffer: readFileSync(jpeg),
+        });
+    else await page.locator("#file").setInputFiles("tests/images/" + file);
     await expect(page.locator("#status")).toContainText("解析完了", {
       timeout: 150000,
     });
@@ -69,6 +86,7 @@ for (const [file, truth] of cases)
       ...scores,
       elapsed: record.analysis.elapsed,
       aiStatus: record.analysis.aiStatus,
+      rejected: record.analysis.rejectedCandidates?.length ?? 0,
     };
     mkdirSync("tests/reports/hybrid-browser", { recursive: true });
     writeFileSync(
