@@ -1,0 +1,10 @@
+{
+  "format": "yolov8-detect",
+  "inputSize": 640,
+  "classes": 4,
+  "allowedClasses": [0, 1, 3],
+  "scoreThreshold": 0.25,
+  "iouThreshold": 0.45,
+  "modelURL": "https://huggingface.co/piky/yolo11/resolve/9ec04d28c48d342906ccaee863a08a6a6394dbc1/yolo11n.onnx",
+  "sha256": "8b28ce48c1b5e16a3d3878cf541783070b413701c62e7e0b879659cdd7496228"
+}
