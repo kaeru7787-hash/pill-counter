@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { resolve, extname, sep } from "node:path";
 import sharp from "sharp";
+import { positionMetrics } from "../../src/vision/positionMetrics";
 test("JPEG EXIF orientation is applied before overlay coordinates", async ({
   page,
 }) => {
@@ -224,4 +225,59 @@ test("real tray: 90 spatially supported detections, debug layers and batch corre
     path: `tests/reports/real-${test.info().project.name}.png`,
     fullPage: true,
   });
+});
+
+test("colored tablets in reflective bags: real positions and counts survive browser decoding", async ({
+  page,
+}) => {
+  test.setTimeout(180000);
+  for (const [file, count] of [
+    ["19-bag-round.jpg", 12],
+    ["20-bag-oblong.jpg", 36],
+  ] as const) {
+    await page.goto("./");
+    await page.locator("#file").setInputFiles("tests/images/" + file);
+    await expect(page.locator("#status")).toContainText("解析完了", {
+      timeout: 90000,
+    });
+    await expect(page.locator("#count")).toHaveText(String(count));
+    await expect(page.locator("#list button")).toHaveCount(count);
+    await expect(page.locator("#confidence")).toContainText("要確認");
+    await page.locator("#save").click();
+    await expect(page.locator("#status")).toContainText("この端末に保存");
+    const downloadPromise = page.waitForEvent("download");
+    await page.locator("#export").click();
+    const stream = await (await downloadPromise).createReadStream();
+    let exported = "";
+    for await (const chunk of stream!) exported += chunk.toString();
+    const record = JSON.parse(exported).records.find(
+      (r: { filename: string }) => r.filename === file,
+    );
+    const annotation = JSON.parse(
+      await readFile(
+        "tests/annotations/" + file.replace(".jpg", ".json"),
+        "utf8",
+      ),
+    );
+    const centers = annotation.centers.map(([x, y]: number[]) => ({
+      x: (x * record.analysis.width) / annotation.width,
+      y: (y * record.analysis.height) / annotation.height,
+    }));
+    const scores = positionMetrics(
+      record.analysis.detections.map(
+        (d: { center: { x: number; y: number } }) => d.center,
+      ),
+      centers,
+      (annotation.tolerance * record.analysis.width) / annotation.width,
+    );
+    expect({ tp: scores.tp, fp: scores.fp, fn: scores.fn }).toEqual({
+      tp: count,
+      fp: 0,
+      fn: 0,
+    });
+    await page.screenshot({
+      path: `tests/reports/${file}-${test.info().project.name}.png`,
+      fullPage: true,
+    });
+  }
 });
