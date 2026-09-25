@@ -11,12 +11,18 @@ import type {
   WorkerResponse,
 } from "./types";
 
+let aiEnabled = true;
+try {
+  aiEnabled = localStorage.getItem("pill-ai-enabled") !== "false";
+} catch {
+  /* Storage may be unavailable. */
+}
 const developerMode = new URLSearchParams(location.search).get("debug") === "1";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 <header><div class="brand"><span class="brand-icon">▰</span><div>錠数ノート<small>PILL COUNTER</small></div></div><span class="local">端末内で解析</span></header>
-<main><section class="intro"><div><p class="eyebrow">写真から数える · 目で確かめる</p><h1>錠剤の数を、ひとつずつ。</h1><p>検出した場所を確認し、数え漏れや誤検出を修正できます。</p></div><span class="version">検証版 0.4</span></section>
-<section class="upload-panel"><div class="input-buttons"><label class="button primary" for="camera">撮影<input id="camera" type="file" accept="image/*" capture="environment"></label><label class="button secondary" for="file">写真を選択<input id="file" type="file" accept="image/*"></label></div><p class="guide">真上から撮影してください。影を避け、可能なら錠剤を少し離してください。</p><p class="privacy">写真は端末内だけで解析します。</p></section>
+<main><section class="intro"><div><p class="eyebrow">写真から数える · 目で確かめる</p><h1>錠剤の数を、ひとつずつ。</h1><p>検出した場所を確認し、数え漏れや誤検出を修正できます。</p></div><span class="version">AI試験版 0.5</span></section>
+<section class="upload-panel"><div class="input-buttons"><label class="button primary" for="camera">撮影<input id="camera" type="file" accept="image/*" capture="environment"></label><label class="button secondary" for="file">写真を選択<input id="file" type="file" accept="image/*"></label></div><p class="guide">真上から撮影してください。影を避け、可能なら錠剤を少し離してください。</p><label class="check"><input id="ai-enabled" type="checkbox" ${aiEnabled ? "checked" : ""}>AI併用（試験）</label><p class="privacy">写真は端末内だけで解析します。AI初回は配布元から約5MBのモデルを取得します。</p></section>
 <div id="status" class="status" role="status" aria-live="polite">写真を選ぶと解析を開始します。</div><button id="cancel" class="text-button" hidden>解析を中止</button>
 <div class="workspace"><section class="viewer-panel"><div class="panel-heading"><h2>検出画像</h2><span id="image-meta">未選択</span></div>
 <div id="empty" class="empty"><div class="frame-mark">＋</div><h3>錠剤の写真を読み込む</h3><p>番号と輪郭を重ねて<br>1錠ずつ確認できます。</p><button id="demo" class="text-button">合成サンプルで試す →</button></div>
@@ -26,10 +32,10 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 <div class="viewer-actions"><label>拡大 <input id="zoom" type="range" min="1" max="3" step=".25" value="1"></label><button id="delete-selected" disabled>選択を削除</button><button id="reset-roi" disabled>範囲を解除</button></div>
 <details id="detection-list"><summary>検出一覧（画像を使わず選択・削除）</summary><div id="list"></div></details>
 </section>
-<aside><section class="result-panel"><p class="eyebrow" id="count-label">自動検出</p><div class="count"><span id="count">—</span><span class="unit">錠</span></div><div class="confidence-row"><span>信頼度</span><strong id="confidence" class="badge neutral">未解析</strong></div><p id="auto-count" class="muted">検出数は番号の数と一致します。</p><ul id="reasons"></ul><div id="votes" class="votes" ${developerMode ? "" : "hidden"}></div><label class="confirm"><input id="confirmed" type="checkbox" disabled>すべての番号と数え漏れを目視確認した</label><p class="disclaimer">計数の補助ツールです。写真を使って開発・検証中です。調剤の最終確認に自動計数だけを使わないでください。</p></section>
-<section class="settings-panel" ${developerMode ? "" : "hidden"}><h2>解析設定</h2><label class="field">撮影環境<select id="scene"><option value="tray">黒い計数トレー</option><option value="desk">机・その他の背景</option><option value="bag">透明な分包袋</option></select></label><label class="check"><input id="auto-roi" type="checkbox" checked>黒いトレーの範囲を自動推定</label><label class="check"><input id="debug" type="checkbox">解析表示</label><div id="debug-controls" hidden><label class="field">表示する画像<select id="layer"><option>Original</option><option>Foreground mask</option><option>ROI</option><option>Grayscale</option><option>Threshold</option><option>Morphology</option><option>Markers</option><option>Distance transform</option><option>Watershed</option><option>Contours</option><option selected>Final detections</option></select></label><p id="diagnostics" class="muted"></p></div>${parameterHTML}<label class="field">解析解像度<select id="resolution"><option value="2048">高精度・長辺2048px（標準）</option><option value="3072">長辺3072px</option><option value="10000">元解像度（上限600万画素）</option></select></label><button id="analyze" class="button secondary full" disabled>この設定で再解析</button><p id="ai-status" class="muted">AIモデルは任意で追加できます。</p></section></aside></div>
+<aside><section class="result-panel"><p class="eyebrow" id="count-label">自動検出</p><div class="count"><span id="count">—</span><span class="unit">錠</span></div><div class="confidence-row"><span>信頼度</span><strong id="confidence" class="badge neutral">未解析</strong></div><p id="auto-count" class="muted">検出数は番号の数と一致します。</p><p id="ai-status" class="muted">AI併用の試験版です。</p><ul id="reasons"></ul><div id="votes" class="votes" ${developerMode ? "" : "hidden"}></div><label class="confirm"><input id="confirmed" type="checkbox" disabled>すべての番号と数え漏れを目視確認した</label><p class="disclaimer">計数の補助ツールです。写真を使って開発・検証中です。調剤の最終確認に自動計数だけを使わないでください。</p></section>
+<section class="settings-panel" ${developerMode ? "" : "hidden"}><h2>解析設定</h2><label class="field">撮影環境<select id="scene"><option value="tray">黒い計数トレー</option><option value="desk">机・その他の背景</option><option value="bag">透明な分包袋</option></select></label><label class="check"><input id="auto-roi" type="checkbox" checked>黒いトレーの範囲を自動推定</label><label class="check"><input id="debug" type="checkbox">解析表示</label><div id="debug-controls" hidden><label class="field">表示する画像<select id="layer"><option>Original</option><option>Foreground mask</option><option>ROI</option><option>Grayscale</option><option>Threshold</option><option>Morphology</option><option>Markers</option><option>Distance transform</option><option>Watershed</option><option>Contours</option><option selected>Final detections</option></select></label><p id="diagnostics" class="muted"></p></div>${parameterHTML}<label class="field">解析解像度<select id="resolution"><option value="2048">高精度・長辺2048px（標準）</option><option value="3072">長辺3072px</option><option value="10000">元解像度（上限600万画素）</option></select></label><button id="analyze" class="button secondary full" disabled>この設定で再解析</button></section></aside></div>
 <section class="data-panel" ${developerMode ? "" : "hidden"}><div><h2>検証データ</h2><p>元画像・自動検出・訂正後の結果を、このブラウザ内に保存します。</p><small>元画像には袋の印字も含まれます。書き出す前に内容を確認してください。</small></div><div class="data-actions"><button id="save" disabled>この結果を端末に保存</button><button id="export">検証データを書き出す</button><button id="clear" class="text-button">保存データを削除</button></div></section>
-<footer>錠数ノート v0.4.0 <span>画像は端末内に。判断は確認できる形に。</span><span id="offline">オフライン準備中</span></footer></main>`;
+<footer>錠数ノート v0.5.0-trial <span>画像は端末内に。判断は確認できる形に。</span><span id="offline">オフライン準備中</span></footer></main>`;
 const $ = <T extends HTMLElement = HTMLElement>(s: string) =>
   document.querySelector<T>(s)!;
 const viewer = new ImageViewer($<HTMLCanvasElement>("#image-canvas"));
@@ -47,6 +53,7 @@ let revision = 0,
   recordID = crypto.randomUUID();
 let timer: ReturnType<typeof setTimeout> | undefined;
 const settings = (): Settings => ({
+  useAI: $<HTMLInputElement>("#ai-enabled").checked,
   scene: $<HTMLSelectElement>("#scene").value as Settings["scene"],
   autoROI: $<HTMLInputElement>("#auto-roi").checked,
   debug: $<HTMLInputElement>("#debug").checked,
@@ -60,6 +67,7 @@ function status(message: string, error = false) {
 }
 function setBusy(value: boolean) {
   busy = value;
+  $<HTMLInputElement>("#ai-enabled").disabled = value;
   $("#cancel").hidden = !value;
   for (const id of ["analyze", "reset-roi"])
     $<HTMLButtonElement>(`#${id}`).disabled = value || !image;
@@ -218,7 +226,11 @@ async function run() {
   clearTimeout(timer);
   const id = ++revision;
   setBusy(true);
-  status("画像を解析しています…");
+  status(
+    runSettings.useAI
+      ? "画像処理とAIで解析しています…（初回はモデルを取得）"
+      : "画像を解析しています…",
+  );
 
   worker = new Worker(new URL("./workers/visionWorker.ts", import.meta.url), {
     type: "module",
@@ -496,3 +508,12 @@ if ("serviceWorker" in navigator && import.meta.env.PROD)
       $("#offline").textContent = "オフライン準備未完了";
     });
 else $("#offline").textContent = "開発モード";
+$<HTMLInputElement>("#ai-enabled").onchange = () => {
+  try {
+    localStorage.setItem(
+      "pill-ai-enabled",
+      String($<HTMLInputElement>("#ai-enabled").checked),
+    );
+  } catch {}
+  void run();
+};
