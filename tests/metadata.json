@@ -1272,5 +1272,15 @@
     "kind": "real",
     "scene": "bag",
     "category": "Bag artifact / Merged pills / Split pill"
+  },
+  "21-yellow-tray-round.png": {
+    "kind": "real",
+    "scene": "tray",
+    "category": "Reflection / Background / Merged pills"
+  },
+  "22-yellow-tray-oblong.png": {
+    "kind": "real",
+    "scene": "tray",
+    "category": "Reflection / Background / Merged pills"
   }
 }
