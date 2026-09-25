@@ -302,7 +302,7 @@ export async function analyzeTray(
       debug.Watershed = raster(splits.markers, "labels");
     }
     return {
-      version: "0.2.0",
+      version: "0.3.0",
       width: w,
       height: h,
       roi,

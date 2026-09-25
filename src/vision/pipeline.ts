@@ -3,10 +3,11 @@ import { automaticROI, median, preprocess } from "./preprocess";
 import { segment } from "./segmentation";
 import { contours, relativeFilter } from "./shapeFilter";
 import { splitWatershed } from "./watershed";
+import { analyzeChromatic } from "./chromaticPipeline";
 import { analyzeTray } from "./trayPipeline";
 import { confidence, spatialAgreement, chooseDetections } from "./ensemble";
 import type { Analysis, DebugImage, Raster, Settings, ROI } from "../types";
-export const VERSION = "0.2.0";
+export const VERSION = "0.3.0";
 export function clampROI(roi: ROI, w: number, h: number): ROI {
   const x = Math.max(0, Math.min(w - 3, Math.floor(roi.x))),
     y = Math.max(0, Math.min(h - 3, Math.floor(roi.y)));
@@ -21,6 +22,8 @@ export async function analyze(
   image: Raster,
   settings: Settings,
 ): Promise<Analysis> {
+  const chromatic = await analyzeChromatic(image, settings);
+  if (chromatic) return chromatic;
   if (settings.scene === "tray") {
     const tray = await analyzeTray(image, settings);
     if (tray) return tray;
