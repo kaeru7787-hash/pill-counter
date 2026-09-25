@@ -66,6 +66,7 @@ export type Analysis = {
   algorithm?: string;
   estimatedDiameter?: number;
   candidates?: Detection[];
+  rejectedCandidates?: Detection[];
 };
 export type WorkerRequest = {
   id: number;
