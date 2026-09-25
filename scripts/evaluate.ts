@@ -119,7 +119,7 @@ for (const [file, truth] of Object.entries(ground)) {
 const report = {
   generatedAt: new Date().toISOString(),
   scope:
-    "One development real image plus synthetic regression fixtures. Not an independent clinical validation set.",
+    "Development photographs and synthetic regression fixtures. Not an independent clinical validation set.",
   metrics: metrics(rows),
   byKind: Object.fromEntries(
     [...new Set(rows.map((r) => r.kind))].map((kind) => [
@@ -134,7 +134,7 @@ writeFileSync(
   "tests/reports/latest.json",
   JSON.stringify(report, null, 2) + "\n",
 );
-let md = `# 精度評価\n\n生成: ${report.generatedAt}\n\n実写1枚と合成17枚の開発用評価です。未知の実写・調剤現場の精度を保証しません。\n\n|画像|正解|検出|誤差|絶対誤差率|信頼度|想定原因|\n|---|---:|---:|---:|---:|---|---|\n`;
+let md = `# 精度評価\n\n生成: ${report.generatedAt}\n\n実写${rows.filter((r) => r.kind === "real").length}枚と合成${rows.filter((r) => r.kind === "synthetic").length}枚の開発用評価です。未知の実写・調剤現場の精度を保証しません。\n\n|画像|正解|検出|誤差|絶対誤差率|信頼度|想定原因|\n|---|---:|---:|---:|---:|---|---|\n`;
 for (const r of rows)
   md += `|${r.file}|${r.truth}|${r.predicted}|${r.error}|${r.absolutePercentageError === null ? "対象外" : (r.absolutePercentageError * 100).toFixed(2) + "%"}|${r.confidence}|${r.category}|\n`;
 md += `\n## 指標\n\n\x60\x60\x60json\n${JSON.stringify(report.metrics, null, 2)}\n\x60\x60\x60\n\nMAPEは正解0枚を除外。要確認画像も除外せず全件評価します。\n`;

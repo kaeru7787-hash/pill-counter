@@ -11,7 +11,11 @@ const { data, info } = await sharp(file)
   .toBuffer({ resolveWithObject: true });
 const result = await analyze(
   { width: info.width, height: info.height, data: new Uint8ClampedArray(data) },
-  { scene: "tray", autoROI: process.env.AUTO_ROI === "1", debug: true },
+  {
+    scene: process.env.SCENE === "bag" ? "bag" : "tray",
+    autoROI: process.env.AUTO_ROI === "1",
+    debug: true,
+  },
 );
 mkdirSync("tests/reports/debug", { recursive: true });
 const { debug, ...rest } = result;
