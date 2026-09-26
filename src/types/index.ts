@@ -33,6 +33,7 @@ export type Parameters = {
   houghSensitivity?: number;
 };
 export type Settings = {
+  target?: "pill" | "bottle";
   scene: "tray" | "desk" | "bag";
   autoROI: boolean;
   debug: boolean;
