@@ -438,7 +438,7 @@ export async function analyzeBottles(
     );
     detections = detections.map((d, i) => ({ ...d, id: `cap-${i + 1}` }));
     return {
-      version: "0.8.2",
+      version: "0.9.0",
       width: image.width,
       height: image.height,
       roi,
@@ -451,7 +451,7 @@ export async function analyzeBottles(
       confidence: {
         level: "review",
         reasons: [
-          "点眼ボトルの試験モードです。キャップ1個を1本として数えます。",
+          "キャップ1個を1本として数えます。",
           "横倒し・重なり・透明や白いキャップは見逃す場合があります。番号を確認してください。",
           ...(unresolvedSeals
             ? [
@@ -462,8 +462,7 @@ export async function analyzeBottles(
       },
       elapsed: performance.now() - start,
       debug: {},
-      candidates: settings.debug
-        ? proposals.map((p, i) => ({
+      candidates: proposals.map((p, i) => ({
             id: `proposal-${i}`,
             center: { x: roi.x + p.x / scale, y: roi.y + p.y / scale },
             box: {
@@ -477,8 +476,7 @@ export async function analyzeBottles(
             source: "cv" as const,
             score: p.score,
             flags: [p.region ? "region" : "hough"],
-          }))
-        : undefined,
+          })),
       diagnostics: [
         `キャップ候補 ${proposals.length} / 採用 ${detections.length}`,
         `非円形の安定領域 ${regions.stable} / 写真内の形状基準 ${regions.enabled ? "有効" : "保留"} / 形状照合で補完 ${regions.recovered || 0}`,
