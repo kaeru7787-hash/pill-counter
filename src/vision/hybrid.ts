@@ -2,15 +2,17 @@ import { analyze, clampROI } from "./pipeline";
 import { detectAI } from "../ai/onnxDetector";
 import { fuse } from "../ai/fusion";
 import type { Raster, Settings } from "../types";
+import { analyzeBottles } from "./bottlePipeline";
 
 export async function analyzeHybrid(
   image: Raster,
   settings: Settings,
   baseURL: string,
 ) {
+  if (settings.target === "bottle") return analyzeBottles(image, settings);
   const start = performance.now();
   const result = await analyze(image, settings);
-  result.version = "0.6.0";
+  result.version = "0.7.0";
   if (!settings.useAI) {
     result.aiStatus = "AI併用OFF（画像処理のみ）";
     result.elapsed = performance.now() - start;
