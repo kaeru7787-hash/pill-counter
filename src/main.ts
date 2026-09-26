@@ -1,9 +1,11 @@
 import "./style.css";
+import "./pictokun.css";
 import { parameterHTML, readParameters } from "./components/Parameters";
 import { ImageViewer, type Mode } from "./components/ImageViewer";
 import { ResultExport } from "./components/ResultExport";
 import { LearningPanel } from "./components/LearningPanel";
 import { ResultZoom } from "./components/ResultZoom";
+import { ComicGuide } from "./components/ComicGuide";
 import { loadImage } from "./image";
 import { saveRecord, exportRecords, clearRecords } from "./storage";
 import type {
@@ -23,26 +25,26 @@ try {
 const developerMode = new URLSearchParams(location.search).get("debug") === "1";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
-<header><div class="brand"><span class="brand-icon">▰</span><div>錠数ノート<small>PILL COUNTER</small></div></div><span class="local">端末内で解析</span></header>
-<main><section class="intro"><div><p class="eyebrow">写真から数える · 目で確かめる</p><h1>錠剤の数を、ひとつずつ。</h1><p>検出した場所を確認し、数え漏れや誤検出を修正できます。</p></div><span class="version">試験版 0.9.0</span></section>
-<section class="upload-panel"><label class="field">数える対象<select id="target"><option value="pill">錠剤</option><option value="bottle">点眼ボトル</option></select></label><p id="target-guide" class="guide">錠剤はAI併用で解析します。OFFで画像処理のみと比較できます。</p><div class="input-buttons"><label class="button primary" for="camera">撮影<input id="camera" type="file" accept="image/*" capture="environment"></label><label class="button secondary" for="file">写真を選択<input id="file" type="file" accept="image/*"></label></div><p class="guide">真上から撮影してください。影や照明の映り込みを避け、対象を少し離してください。</p><label class="check"><input id="ai-enabled" type="checkbox" ${aiEnabled ? "checked" : ""}>AI併用</label><p class="privacy">写真は端末内だけで解析します。AI初回は配布元から約5MBのモデルを取得します。</p></section>
+<header class="app-header"><img class="pictokun" src="${import.meta.env.BASE_URL}pictokun.png" alt="" width="96" height="96"><div class="brand-copy"><h1>錠数ノート</h1><button id="open-guide" class="guide-button">漫画で使い方を見る <span aria-hidden="true">↗</span></button></div><span class="local">端末内で解析</span></header>
+<main><section class="upload-panel"><label class="field">数える対象<select id="target"><option value="pill">錠剤</option><option value="bottle">点眼ボトル</option></select></label><p id="target-guide" class="guide">錠剤専用AIで補助します。</p><div class="input-buttons"><label class="button primary" for="camera">撮影<input id="camera" type="file" accept="image/*" capture="environment"></label><label class="button secondary" for="file">写真を選択<input id="file" type="file" accept="image/*"></label></div><label class="check"><input id="ai-enabled" type="checkbox" ${aiEnabled ? "checked" : ""}>AI併用 <span id="ai-model-label" class="model-label">錠剤用</span></label><p class="privacy">写真は送信されません。</p></section>
 <div id="status" class="status" role="status" aria-live="polite">写真を選ぶと解析を開始します。</div><button id="cancel" class="text-button" hidden>解析を中止</button>
 <div class="workspace"><section class="viewer-panel"><div class="panel-heading"><h2>検出画像</h2><span id="image-meta">未選択</span></div>
-<div id="empty" class="empty"><div class="frame-mark">＋</div><h3>数える対象の写真を読み込む</h3><p>番号と輪郭を重ねて<br>1個ずつ確認できます。</p><button id="demo" class="text-button">合成サンプルで試す →</button></div>
+<div id="empty" class="empty"><div class="frame-mark">＋</div><h3>数える対象の写真を読み込む</h3><button id="demo" class="text-button">合成サンプルで試す →</button></div>
 <div id="canvas-wrap" hidden><canvas id="image-canvas" aria-label="検出画像。下の操作モードで追加・削除・範囲指定できます"></canvas></div>
 <div class="toolbar" aria-label="画像の操作"><button data-mode="select" aria-pressed="true">選択</button><button data-mode="add" aria-pressed="false">＋ 追加</button><button data-mode="delete" aria-pressed="false">− 削除</button><button data-mode="roi" aria-pressed="false">範囲指定</button><button data-mode="batch" aria-pressed="false">範囲削除</button><button id="undo" disabled>元に戻す</button><button id="redo" disabled>やり直す</button><button id="reset-detections" disabled>補正を全リセット</button></div>
-<p id="mode-hint" class="hint">番号をタップすると選択できます。濃い青の枠はAI補助、緑は画像処理、水色は手動追加です。</p>
-<div class="viewer-actions"><button id="open-result-zoom" disabled>番号付き画像を拡大</button><span class="muted">ピンチで拡大・縮小できます</span></div>
+<p id="mode-hint" class="hint">番号をタップして選択</p>
+<div class="viewer-actions"><button id="open-result-zoom" disabled>番号付き画像を拡大</button></div>
 <div class="viewer-actions"><label>拡大 <input id="zoom" type="range" min="1" max="3" step=".25" value="1"></label><button id="delete-selected" disabled>選択を削除</button><button id="reset-roi" disabled>範囲を解除</button></div>
-<details id="detection-list"><summary>検出一覧（画像を使わず選択・削除）</summary><div id="list"></div></details>
+<details id="detection-list"><summary>検出一覧</summary><div id="list"></div></details>
 </section>
-<aside><section class="result-panel"><p class="eyebrow" id="count-label">自動検出</p><div class="count"><span id="count">—</span><span class="unit">錠</span></div><div class="result-export"><button id="save-result-image" class="button primary full" disabled>結果画像を保存</button><p class="muted">iPhone / iPadは共有画面で「画像を保存」を選んでください。</p><p id="result-export-status" class="muted" role="status">計数後に保存できます。</p><button id="download-result-image" hidden disabled>ファイルとして保存</button></div><div class="confidence-row"><span>信頼度</span><strong id="confidence" class="badge neutral">未解析</strong></div><p id="auto-count" class="muted">検出数は番号の数と一致します。</p><p id="ai-status" class="muted">AIをOFFにすると画像処理のみの結果と比較できます。</p><ul id="reasons"></ul><details><summary>解析情報</summary><p id="analysis-info" class="muted">未解析</p></details><div id="votes" class="votes" ${developerMode ? "" : "hidden"}></div><label class="confirm"><input id="confirmed" type="checkbox" disabled>すべての番号と数え漏れを目視確認した</label><p class="disclaimer">計数の補助ツールです。写真を使って開発・検証中です。調剤の最終確認に自動計数だけを使わないでください。</p></section>
+<aside><section class="result-panel"><p class="eyebrow" id="count-label">自動検出</p><div class="count"><span id="count">—</span><span class="unit">錠</span></div><div class="result-export"><button id="save-result-image" class="button primary full" disabled>結果画像を保存</button><p id="result-export-status" class="muted" role="status">計数後に保存できます。</p><button id="download-result-image" hidden disabled>ファイルとして保存</button></div><div class="confidence-row"><span>信頼度</span><strong id="confidence" class="badge neutral">未解析</strong></div><p id="auto-count" class="muted"></p><p id="ai-summary" class="ai-summary"></p><details><summary>解析情報</summary><p id="ai-status" class="muted"></p><ul id="reasons"></ul><p id="analysis-info" class="muted">未解析</p></details><div id="votes" class="votes" ${developerMode ? "" : "hidden"}></div><label class="confirm"><input id="confirmed" type="checkbox" disabled>すべての番号と数え漏れを目視確認した</label><p class="disclaimer">最終確認は、番号と実物を見比べてください。</p></section>
 <section class="settings-panel" ${developerMode ? "" : "hidden"}><h2>解析設定</h2><label class="field">撮影環境<select id="scene"><option value="tray">黒い計数トレー</option><option value="desk">机・その他の背景</option><option value="bag">透明な分包袋</option></select></label><label class="check"><input id="auto-roi" type="checkbox" checked>黒いトレーの範囲を自動推定</label><label class="check"><input id="debug" type="checkbox">解析表示</label><div id="debug-controls" hidden><label class="field">表示する画像<select id="layer"><option>Original</option><option>Foreground mask</option><option>ROI</option><option>Grayscale</option><option>Threshold</option><option>Morphology</option><option>Markers</option><option>Distance transform</option><option>Watershed</option><option>Contours</option><option selected>Final detections</option></select></label><p id="diagnostics" class="muted"></p></div>${parameterHTML}<label class="field">解析解像度<select id="resolution"><option value="2048">高精度・長辺2048px（標準）</option><option value="3072">長辺3072px</option><option value="10000">元解像度（上限600万画素）</option></select></label><button id="analyze" class="button secondary full" disabled>この設定で再解析</button></section></aside></div>
 <section id="learning-panel" class="learning-panel"></section>
 <section class="data-panel" ${developerMode ? "" : "hidden"}><div><h2>検証データ</h2><p>元画像・自動検出・訂正後の結果を、このブラウザ内に保存します。</p><small>元画像には袋の印字も含まれます。書き出す前に内容を確認してください。</small></div><div class="data-actions"><button id="save" disabled>この結果を端末に保存</button><button id="export">検証データを書き出す</button><button id="clear" class="text-button">保存データを削除</button></div></section>
-<footer>錠数ノート v0.9.0 <span>画像は端末内に。判断は確認できる形に。</span><a href="https://github.com/kaeru7787-hash/pill-counter/archive/refs/heads/main.zip">ソースコードZIP</a><span id="offline">オフライン準備中</span></footer></main>`;
+<footer>錠数ノート v0.10.0 <a href="https://github.com/kaeru7787-hash/pill-counter/archive/refs/heads/main.zip">ソースコードZIP</a><span id="offline">オフライン準備中</span></footer></main>`;
 const $ = <T extends HTMLElement = HTMLElement>(s: string) =>
   document.querySelector<T>(s)!;
+const comicGuide = new ComicGuide($("#open-guide"));
 const viewer = new ImageViewer($<HTMLCanvasElement>("#image-canvas"));
 const resultZoom = new ResultZoom(viewer);
 const resultExport = new ResultExport(viewer, $<HTMLButtonElement>("#save-result-image"), $<HTMLButtonElement>("#download-result-image"), $("#result-export-status"));
@@ -87,7 +89,7 @@ function setBusy(value: boolean) {
   learningPanel.update(value);
   resultExport.setBusy(value || !result);
   $<HTMLInputElement>("#ai-enabled").disabled =
-    value || $<HTMLSelectElement>("#target").value === "bottle";
+    value;
   $<HTMLSelectElement>("#target").disabled = value;
   $("#cancel").hidden = !value;
   for (const id of ["analyze", "reset-roi"])
@@ -157,6 +159,7 @@ function render() {
   ].join(" · ");
   $("#ai-status").textContent =
     `${result.algorithm || "画像処理"} / ${result.aiStatus || "AI未導入"}`;
+  $("#ai-summary").textContent = !analyzedSettings?.useAI ? "AI OFF" : result.counts.AI !== undefined ? (analyzedSettings?.target === "bottle" ? "点眼専用AIで補助（試作）" : "錠剤専用AIで補助") : "AI未使用・画像処理のみ";
   $("#analysis-info").textContent = [
     `v${result.version}`,
     `${image?.width} × ${image?.height}`,
@@ -264,7 +267,7 @@ async function run() {
   setBusy(true);
   status(
     runSettings.target === "bottle"
-      ? "点眼ボトルのキャップを解析しています…"
+      ? (runSettings.useAI ? "点眼専用AIと画像処理で解析しています…" : "キャップを画像処理で解析しています…")
       : runSettings.useAI
         ? "画像処理とAIで解析しています…（初回はモデルを取得）"
         : "画像を解析しています…",
@@ -570,8 +573,9 @@ $<HTMLInputElement>("#ai-enabled").onchange = () => {
 function syncTargetUI() {
   const bottle = $<HTMLSelectElement>("#target").value === "bottle";
   $("#target-guide").textContent = bottle
-    ? "色付きキャップ1個を1本として数えます。キャップが見える向きで撮影してください。錠剤用AIは使用しません。"
-    : "錠剤はAI併用で解析します。OFFで画像処理のみと比較できます。";
+    ? "点眼専用AIで補助します（少数写真で学習した試作）。"
+    : "錠剤専用AIで補助します。";
+  $("#ai-model-label").textContent = bottle ? "点眼用" : "錠剤用";
   $("#empty h3").textContent = bottle
     ? "点眼ボトルの写真を読み込む"
     : "錠剤の写真を読み込む";
