@@ -4,6 +4,7 @@ test("numbered image zoom, pan, pinch and close preserve corrections", async ({
   page,
   context,
 }) => {
+  await context.route('**/models/config.json',r=>r.fulfill({status:404,body:''}));
   await context.addInitScript(() =>
     localStorage.setItem("pill-ai-enabled", "false"),
   );

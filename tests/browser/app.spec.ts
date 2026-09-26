@@ -8,6 +8,7 @@ import { positionMetrics } from "../../src/vision/positionMetrics";
 // These exercise the CV fallback and editing UI. Real hybrid inference has its
 // own suite so this regression suite remains deterministic and offline.
 test.beforeEach(async ({ context }) => {
+  await context.route('**/models/config.json',r=>r.fulfill({status:404,body:''}));
   await context.addInitScript(() => localStorage.setItem("pill-ai-enabled", "false"));
 });
 test("JPEG EXIF orientation is applied before overlay coordinates", async ({
@@ -37,7 +38,8 @@ test("camera controls, analysis, numbering, corrections, ROI, debug and local ex
     const u = new URL(r.url());
     if (
       ["http:", "https:"].includes(u.protocol) &&
-      !u.hostname.match(/^(127\.0\.0\.1|localhost)$/)
+      !u.hostname.match(/^(127\.0\.0\.1|localhost)$/) &&
+      !(r.method() === "GET" && u.href === "https://huggingface.co/piky/yolo11/resolve/9ec04d28c48d342906ccaee863a08a6a6394dbc1/yolo11n.onnx")
     )
       outgoing.push(r.url());
   });
@@ -52,7 +54,9 @@ test("camera controls, analysis, numbering, corrections, ROI, debug and local ex
   await expect(page.locator("#status")).toContainText("解析完了");
   await expect(page.locator("#count")).toHaveText("24");
   await expect(page.locator("#list button")).toHaveCount(24);
-  await expect(page.locator("#confidence")).toHaveText("中");
+  // SW requests bypass route interception on WebKit: disabled model = medium,
+  // failed download = review. Neither path may claim high confidence.
+  await expect(page.locator("#confidence")).toHaveText(/^(中|低・要確認)$/);
   await page.locator('[data-mode="add"]').click();
   const canvas = page.locator("#image-canvas");
   await canvas.scrollIntoViewIfNeeded();
@@ -314,3 +318,4 @@ test("normal screen has only counting controls; developer panels are absent from
     fullPage: true,
   });
 });
+

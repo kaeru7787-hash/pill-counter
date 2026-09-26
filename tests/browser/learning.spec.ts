@@ -1,162 +1,165 @@
 import { test, expect } from "@playwright/test";
-import { readFile } from "node:fs/promises";
 import sharp from "sharp";
 test.use({ serviceWorkers: "block" });
 test.beforeEach(async ({ page, context }) => {
+  await context.route("**/models/config.json", (r) =>
+    r.fulfill({ status: 404, body: "" }),
+  );
   await context.addInitScript(() =>
     localStorage.setItem("pill-ai-enabled", "false"),
   );
   await page.goto("./");
 });
-test("confirmed feedback is private, redacted, persistent, deduplicated and exportable", async ({
-  page,
-}) => {
-  const outgoing: string[] = [];
-  page.on("request", (r) => {
-    if (r.method() !== "GET") outgoing.push(r.url());
-  });
-  await page.locator("#learning-panel > details > summary").click();
-  await expect(page.locator('[data-learn="capture"]')).toBeDisabled();
+const model = async (page: any) =>
+  page.evaluate(() =>
+    JSON.parse(localStorage.getItem("pill-auto-learning-v1:pill") || "null"),
+  );
+async function sample(shift = 0) {
+  return sharp(
+    Buffer.from(
+      `<svg width="640" height="480"><rect width="640" height="480" fill="#303840"/><circle cx="${140 + shift}" cy="160" r="28" fill="#eee"/><circle cx="${290 + shift}" cy="160" r="28" fill="#eee"/><circle cx="${440 + shift}" cy="160" r="28" fill="#e9b153"/></svg>`,
+    ),
+  )
+    .png()
+    .toBuffer();
+}
+async function load(page: any, shift = 0) {
   await page
     .locator("#file")
-    .setInputFiles("tests/images/01-white-separated.png");
+    .setInputFiles({
+      name: "sample.png",
+      mimeType: "image/png",
+      buffer: await sample(shift),
+    });
   await expect(page.locator("#status")).toContainText("解析完了");
-  await expect(page.locator("#target option[value=bottle]")).toHaveText(
-    "点眼ボトル",
-  );
-  await page.locator("#confirmed").check();
-  await page.locator('[data-learn="capture"]').click();
-  const dialog = page.locator(".learning-dialog");
-  await expect(dialog).toBeVisible();
-  await dialog.locator('[data-action="save"]').click();
-  await expect(dialog.locator('[data-action="status"]')).toContainText(
-    "チェック",
-  );
-  await dialog.locator('[data-action="group"]').fill("丸錠A");
-  // Redact the top-left region, including image background, then inspect exported bytes.
-  const canvas = dialog.locator("canvas").first();
-  await canvas.scrollIntoViewIfNeeded();
-  const box = (await canvas.boundingBox())!;
-  await page.mouse.move(box.x + box.width * 0.02, box.y + box.height * 0.02);
-  await page.mouse.down();
-  await page.mouse.move(box.x + box.width * 0.15, box.y + box.height * 0.15);
-  await page.mouse.up();
-  await dialog.locator('[data-action="consent"]').check();
-  await dialog.locator('[data-action="save"]').click();
-  await expect(dialog).not.toBeVisible();
-  await expect(page.locator('[data-learn="message"]')).toContainText(
-    "端末内に保存",
-  );
-  await page.locator('[data-learn="train"]').click();
-  await expect(page.locator('[data-learn="model"]')).toContainText("4組以上");
-  await expect(page.locator('[data-learn="suggest"]')).toBeDisabled();
-  page.once("dialog", (d) => d.accept());
-  const downloading = page.waitForEvent("download");
-  await page.locator('[data-learn="export"]').click();
-  const file = await downloading,
-    data = JSON.parse(await readFile((await file.path())!, "utf8"));
-  expect(data.records).toHaveLength(1);
-  const record = data.records[0];
-  expect(record.confirmed).toBe(true);
-  expect(record.totalCount).toBe(24);
-  expect(record.filename).toBeUndefined();
-  expect(record.original).toBeUndefined();
-  expect(record.examples.every((e: { y: number }) => e.y === 1)).toBe(true);
-  const png = Buffer.from(record.imagePNG, "base64"),
-    meta = await sharp(png).metadata();
-  expect(meta.exif).toBeUndefined();
-  const { data: rgb, info } = await sharp(png)
-    .removeAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  const i =
-    (Math.round(info.height * 0.08) * info.width +
-      Math.round(info.width * 0.08)) *
-    info.channels;
-  expect([...rgb.subarray(i, i + 3)]).toEqual([0, 0, 0]);
-  // A repeat save replaces the same photo, not a new training/validation case.
-  await page.locator('[data-learn="capture"]').click();
-  await dialog.locator('[data-action="consent"]').check();
-  await dialog.locator('[data-action="save"]').click();
-  await expect(page.locator('[data-learn="message"]')).toContainText(
-    "同じ写真",
-  );
-  await page.reload();
-  await page.locator("#learning-panel > details > summary").click();
-  await page.getByText("保存済みデータの確認・削除", { exact: true }).click();
-  await expect(page.locator(".learning-record")).toHaveCount(1);
-  page.once("dialog", (d) => d.accept());
-  await page
-    .getByRole("button", { name: "このデータを削除", exact: true })
-    .click();
-  await expect(page.locator(".learning-record")).toHaveCount(0);
-  expect(outgoing).toEqual([]);
-});
-test("an actual worker trains on independent sets; edits still require confirmation", async ({
+}
+test("correction trains immediately, next photo uses learned weights, no training images persist", async ({
   page,
 }) => {
-  // Synthetic records isolate training integration; not evidence of real-photo accuracy.
-  await page.evaluate(async () => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const r = indexedDB.open("pill-counter-learning", 1);
-      r.onupgradeneeded = () =>
-        r.result.createObjectStore("records", { keyPath: "id" });
-      r.onsuccess = () => resolve(r.result);
-      r.onerror = () => reject(r.error);
+  const posts: string[] = [];
+  page.on("request", (r) => {
+    if (r.method() !== "GET") posts.push(r.url());
+  });
+  await expect(page.locator("#ai-enabled")).toHaveCount(0);
+  await expect(page.locator("[data-learn]")).toHaveCount(0);
+  await load(page);
+  await expect(page.locator("#count")).toHaveText("3");
+  await page.locator('[data-mode="delete"]').click();
+  const b = (await page.locator("#image-canvas").boundingBox())!;
+  await page
+    .locator("#image-canvas")
+    .click({
+      position: { x: (b.width * 440) / 640, y: (b.height * 160) / 480 },
     });
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction("records", "readwrite");
-      for (let g = 0; g < 4; g++)
-        tx.objectStore("records").put({
-          schemaVersion: 1,
-          id: `test-${g}`,
-          imageHash: `test-${g}`,
-          group: `group-${g}`,
-          target: "pill",
-          createdAt: "2026-09-26",
-          appVersion: "test",
-          algorithm: "test",
-          width: 10,
-          height: 10,
-          roi: { x: 0, y: 0, width: 10, height: 10 },
-          masks: [],
-          image: new ArrayBuffer(0),
-          centers: [],
-          removed: [],
-          confirmed: true,
-          totalCount: 6,
-          examples: Array.from({ length: 9 }, (_, i) => ({
-            x: Array(18).fill((i < 6 ? 0.8 : 0.2) + g * 0.002),
-            y: i < 6 ? 1 : 0,
-            center: { x: i, y: 2 },
-            box: { x: 0, y: 0, width: 2, height: 2 },
-            kind: i < 6 ? "confirmed" : "background",
-          })),
-        });
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
+  await expect(page.locator("#count")).toHaveText("2");
+  expect(
+    (await model(page)).recent.model.units.some(
+      (u: any) => u.kind === "remove",
+    ),
+  ).toBe(true);
+  expect((await model(page)).recent.complete).toBe(false);
+  await load(page, 35);
+  await expect(page.locator("#count")).toHaveText("2");
+  await page.getByText("解析情報", { exact: true }).click();
+  await expect(page.locator("#analysis-info")).toContainText("除外 1");
+  const stored = JSON.stringify(await model(page));
+  expect(stored).not.toMatch(/imagePNG|data:image|filename|center/);
+  expect(
+    await page.evaluate(async () => {
+      const db = await new Promise<IDBDatabase>((r) => {
+        const q = indexedDB.open("pill-counter-learning", 1);
+        q.onsuccess = () => r(q.result);
+      });
+      const n = await new Promise((r) => {
+        const q = db.transaction("records").objectStore("records").count();
+        q.onsuccess = () => r(q.result);
+      });
+      db.close();
+      return n;
+    }),
+  ).toBe(0);
+  expect(posts).toEqual([]);
+  await page.reload();
+  await load(page, 10);
+  await expect(page.locator("#count")).toHaveText("2");
+});
+test("undo replaces training, pagehide completes once, reload recovers interrupted work", async ({
+  page,
+}) => {
+  await load(page);
+  await page.locator('[data-mode="delete"]').click();
+  const b = (await page.locator("#image-canvas").boundingBox())!;
+  await page
+    .locator("#image-canvas")
+    .click({
+      position: { x: (b.width * 440) / 640, y: (b.height * 160) / 480 },
+    });
+  await page.locator("#undo").click();
+  expect(
+    (await model(page)).recent.model.units.some(
+      (u: any) => u.kind === "remove",
+    ),
+  ).toBe(false);
+  await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
+  expect((await model(page)).recent.complete).toBe(true);
+  await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
+  expect((await model(page)).recent.model.updates).toBe(1);
+  await page.reload();
+  await load(page, 20);
+  await expect(page.locator("#count")).toHaveText("3");
+});
+test("persistence failure is visible without losing editing", async ({
+  page,
+}) => {
+  await page.evaluate(() => {
+    Storage.prototype.setItem = function (key: string, value: string) {
+      if (key.startsWith("pill-auto-learning"))
+        throw new DOMException("Quota", "QuotaExceededError");
+    };
+  });
+  await load(page);
+  await expect(page.locator("#auto-learning-status")).toContainText(
+    "保存できません",
+  );
+  await expect(page.locator("#count")).toHaveText("3");
+});
+test("legacy training records are removed only after actual weights are durable", async ({
+  page,
+}) => {
+  await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((r) => {
+      const q = indexedDB.open("pill-counter-learning", 1);
+      q.onsuccess = () => r(q.result);
+    });
+    await new Promise<void>((r) => {
+      const t = db.transaction("records", "readwrite");
+      t.objectStore("records").put({
+        id: "legacy",
+        confirmed: true,
+        target: "pill",
+        width: 100,
+        height: 100,
+        image: new ArrayBuffer(100),
+        examples: [
+          {
+            x: Array(18).fill(0.5),
+            y: 1,
+            kind: "added",
+            box: { width: 20, height: 20 },
+          },
+        ],
+      });
+      t.oncomplete = () => r();
     });
     db.close();
   });
   await page.reload();
-  await page.locator("#learning-panel > details > summary").click();
-  await page
-    .locator("#file")
-    .setInputFiles("tests/images/01-white-separated.png");
-  await expect(page.locator("#status")).toContainText("解析完了");
-  await page.locator('[data-learn="train"]').click();
-  await expect(page.locator('[data-learn="model"]')).toContainText(
-    "補助候補の提示に使用できます",
+  await expect(page.locator("#auto-learning-status")).toContainText(
+    "以前の補正も学習",
   );
-  await expect(page.locator('[data-learn="suggest"]')).toBeEnabled();
-  await page.locator('[data-learn="suggest"]').click();
-  await expect(page.locator("#count")).toHaveText("24");
-  await page.locator("#confirmed").check();
-  await page.locator('[data-mode="add"]').click();
-  const c = page.locator("#image-canvas"),
-    b = (await c.boundingBox())!;
-  await c.click({ position: { x: b.width * 0.88, y: b.height * 0.85 } });
-  await expect(page.locator("#count")).toHaveText("25");
-  await expect(page.locator("#confirmed")).not.toBeChecked();
-  await expect(page.locator('[data-learn="capture"]')).toBeDisabled();
+  const s = await model(page);
+  expect(s.base.units).toHaveLength(1);
+  expect(s.migrated).toEqual(["legacy"]);
+  await page.reload();
+  expect((await model(page)).base.updates).toBe(1);
 });

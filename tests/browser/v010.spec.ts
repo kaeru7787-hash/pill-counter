@@ -1,7 +1,8 @@
 import {test,expect} from '@playwright/test';
 import {existsSync} from 'node:fs';
 test('comic opens under service worker, scrolls, closes and preserves edits',async({page,context})=>{
- await context.addInitScript(()=>localStorage.setItem('pill-ai-enabled','false'));
+ await context.route('**/models/config.json',r=>r.fulfill({status:404,body:''}));
+  await context.addInitScript(()=>localStorage.setItem('pill-ai-enabled','false'));
  await page.goto('./');
  if(test.info().project.name==='chromium')await page.evaluate(async()=>{await navigator.serviceWorker.ready;});
  await page.reload();
@@ -29,19 +30,17 @@ test('comic opens under service worker, scrolls, closes and preserves edits',asy
 });
 test.describe('bottle inference',()=>{
 test.use({serviceWorkers:'block'});
-test('bottle mode uses the shipped dedicated ONNX; AI OFF and fallback stay editable',async({page,context})=>{
+test('bottle mode uses the shipped dedicated ONNX; fallback stays editable',async({page,context})=>{
  test.skip(!process.env.BOTTLE_REAL||!existsSync('work/originals/35-blue-bottles.jpeg'),'Private prototype photo');test.setTimeout(180000);
  const urls:string[]=[];page.on('request',r=>urls.push(r.url()));
  await page.goto('./');await page.locator('#target').selectOption('bottle');
- await expect(page.locator('#ai-enabled')).toBeEnabled();await page.locator('#ai-enabled').check();
+ await expect(page.locator('#ai-enabled')).toHaveCount(0);
  await page.locator('#file').setInputFiles('work/originals/35-blue-bottles.jpeg');
  await expect(page.locator('#status')).toContainText('解析完了',{timeout:150000});
  await expect(page.locator('#count')).toHaveText('40');await expect(page.locator('#ai-summary')).toContainText('点眼専用AI');
  expect(urls.some(u=>u.includes('eyedrop-bottle.onnx'))).toBe(true);expect(urls.some(u=>u.includes('huggingface'))).toBe(false);
- await page.locator('#ai-enabled').uncheck();await expect(page.locator('#status')).toContainText('解析完了');
- await expect(page.locator('#count')).toHaveText('39');await expect(page.locator('#ai-summary')).toHaveText('AI OFF');
  await context.route('**/models/bottle-config.json',r=>r.fulfill({status:404,body:''}));
- await page.locator('#ai-enabled').check();await expect(page.locator('#status')).toContainText('解析完了');
+ await page.reload();await page.locator('#target').selectOption('bottle');await page.locator('#file').setInputFiles('work/originals/35-blue-bottles.jpeg');await expect(page.locator('#status')).toContainText('解析完了');
  await expect(page.locator('#ai-summary')).toContainText('画像処理のみ');await expect(page.locator('[data-mode="add"]')).toBeEnabled();
 });
 });
