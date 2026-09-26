@@ -57,6 +57,28 @@ test("bright soft reflection is rejected while a small sharp pill remains", () =
   assert.deepEqual(pixelRejection(image, small, reference), []);
 });
 
+test("padded AI boxes retain dim round pills but reject empty gaps", () => {
+  const refs = Array.from({ length: 10 }, (_, i) => disk(40 + i * 50, 50));
+  const real = disk(140, 150),
+    padded = { ...disk(140, 150, 34), source: "ai" as const };
+  const empty = { ...disk(250, 150, 34), source: "ai" as const };
+  const image = raster(550, 230, (x, y) => {
+    if (refs.some((d) => Math.hypot(x - d.center.x, y - d.center.y) < 20))
+      return [255, 205, 140];
+    if (Math.hypot(x - real.center.x, y - real.center.y) < 20)
+      return [230, 175, 110];
+    return [100, 100, 100];
+  });
+  const reference = pixelReference(image, refs);
+  assert.ok(reference.ready && reference.uniformSize);
+  // The old perimeter-only test samples outside the real tablet and rejects it.
+  assert.ok(
+    pixelRejection(image, padded, { ...reference, uniformSize: false }).length,
+  );
+  assert.deepEqual(pixelRejection(image, padded, reference), []);
+  assert.ok(pixelRejection(image, empty, reference).length);
+});
+
 test("adjacent rounded rectangular caps retain separate contours and ROI coordinates", async () => {
   const centers = Array.from({ length: 16 }, (_, i) => ({
     x: 90 + (i % 8) * 58,
