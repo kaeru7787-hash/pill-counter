@@ -1,18 +1,19 @@
 {
   "name": "pill-counter-local",
   "private": true,
-  "version": "0.7.0",
+  "version": "0.8.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --configLoader runner",
     "build": "tsc --noEmit && node scripts/assets.mjs && vite build --configLoader runner && node scripts/service-worker.mjs",
     "preview": "vite preview --configLoader runner --host 127.0.0.1",
-    "test": "node scripts/run.mjs tests/core.test.ts --test && node scripts/run.mjs tests/hybrid.test.ts --test && node scripts/run.mjs tests/v07.test.ts --test",
+    "test": "node scripts/run.mjs tests/core.test.ts --test && node scripts/run.mjs tests/hybrid.test.ts --test && node scripts/run.mjs tests/v07.test.ts --test && node scripts/run.mjs tests/v08.test.ts --test",
     "fixtures": "node scripts/run.mjs scripts/fixtures.ts",
     "evaluate": "node scripts/run.mjs scripts/evaluate.ts",
     "test:browser": "playwright test",
     "test:hybrid": "node scripts/run.mjs tests/hybrid.test.ts --test",
-    "test:v07": "node scripts/run.mjs tests/v07.test.ts --test"
+    "test:v07": "node scripts/run.mjs tests/v07.test.ts --test",
+    "test:v08": "node scripts/run.mjs tests/v08.test.ts --test"
   },
   "dependencies": {
     "@techstark/opencv-js": "4.12.0-release.1",
