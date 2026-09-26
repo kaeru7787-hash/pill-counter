@@ -10,3 +10,7 @@ Edit this completed Japanese comic, preserve layout, all art, all other Japanese
 
 Create one app mascot illustration matching the green faceless pictogram people in the reference instructional comic. Reference is STYLE only, do not reproduce the comic. Single friendly solid emerald green round-headed pictogram person, blank face, thick rounded limbs, subtle dark navy outline, white plus sign on chest, holding a dark navy tablet with one simple white pill icon while raising the other hand in greeting. Bust/upper body, simple bold silhouette legible at 80px. Centered square image, clean opaque WHITE background, no words, no letters, no speech bubbles, no shadows, no extra panels. Crisp flat public-information pictogram style with small mint accent.
 
+
+
+## v0.11.0
+01-count.png and 03-save.png edited with the built-in image generator. Section 3 now describes always-on target-specific AI; section 11 describes automatic on-device correction learning and deletion of training images. Other sections are preserved. Both outputs visually inspected.
