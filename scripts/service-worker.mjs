@@ -20,6 +20,6 @@ writeFileSync(
 const CORE=${JSON.stringify(core)}.map(p=>new URL(p,ROOT).href);
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE))));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith(PREFIX)&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
-self.addEventListener('fetch',event=>{const request=event.request,url=new URL(request.url);if(request.method!=='GET'||url.origin!==ROOT.origin||!url.pathname.startsWith(ROOT.pathname))return;
+self.addEventListener('fetch',event=>{const request=event.request,url=new URL(request.url);if(url.pathname.endsWith('.onnx')||url.pathname.endsWith('.pt'))return;if(request.method!=='GET'||url.origin!==ROOT.origin||!url.pathname.startsWith(ROOT.pathname))return;
 event.respondWith(caches.open(CACHE).then(async cache=>{if(request.mode==='navigate'){const page=await cache.match(request,{ignoreSearch:true,ignoreVary:true});if(page)return page;if(url.pathname===ROOT.pathname){const shell=await cache.match(new URL('index.html',ROOT).href,{ignoreVary:true});if(shell)return shell;}}const cached=await cache.match(request,{ignoreVary:true});if(cached)return cached;try{const response=await fetch(request);if(response.ok&&response.type==='basic'&&!response.headers.get('content-type')?.includes('text/html'))await cache.put(request,response.clone());return response;}catch(error){if(url.pathname.endsWith('/models/pill-counter.onnx'))return new Response('',{status:404});throw error;}}));});`,
 );
