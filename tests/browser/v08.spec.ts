@@ -32,7 +32,7 @@ test("adjacent rectangular caps and visible analysis version", async ({
   await expect(page.locator("#status")).toContainText("解析完了");
   await expect(page.locator("#count")).toHaveText("16");
   await page.getByText("解析情報", { exact: true }).click();
-  await expect(page.locator("#analysis-info")).toContainText("v0.8.1");
+  await expect(page.locator("#analysis-info")).toContainText("v0.8.2");
   await expect(page.locator("#analysis-info")).toContainText(
     "写真内の形状基準 有効",
   );
@@ -161,6 +161,6 @@ for (const [name, target, count] of [
       await expect(page.locator("#count")).toHaveText(String(count));
       expect(metrics.fp).toBe(0);
       expect(metrics.fn).toBe(0);
-      await expect(page.locator("#analysis-info")).toContainText("v0.8.1");
+      await expect(page.locator("#analysis-info")).toContainText("v0.8.2");
     });
   }

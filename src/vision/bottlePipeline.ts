@@ -438,7 +438,7 @@ export async function analyzeBottles(
     );
     detections = detections.map((d, i) => ({ ...d, id: `cap-${i + 1}` }));
     return {
-      version: "0.8.1",
+      version: "0.8.2",
       width: image.width,
       height: image.height,
       roi,
