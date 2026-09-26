@@ -1,0 +1,12 @@
+{
+  "format": "yolov8-detect",
+  "inputSize": 640,
+  "classes": 1,
+  "allowedClasses": [
+    0
+  ],
+  "scoreThreshold": 0.45,
+  "iouThreshold": 0.55,
+  "modelURL": "models/eyedrop-bottle.onnx",
+  "sha256": "e44003020d6ac9ba31f75b069ee6b520b7d9afebe788c1c20726cb17f5b89a8a"
+}

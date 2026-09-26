@@ -1,0 +1,95 @@
+{
+  "modelSHA256": "e44003020d6ac9ba31f75b069ee6b520b7d9afebe788c1c20726cb17f5b89a8a",
+  "notes": "Development data only; labels provisional; square photo excluded from training but used for candidate selection.",
+  "rows": [
+    {
+      "name": "33-red-bottles",
+      "split": "train",
+      "reference": 53,
+      "cv": 53,
+      "ai": 49,
+      "hybrid": 53,
+      "baseline": {
+        "tp": 53,
+        "fp": 0,
+        "fn": 0,
+        "missing": []
+      },
+      "candidate": {
+        "tp": 53,
+        "fp": 0,
+        "fn": 0,
+        "missing": []
+      },
+      "elapsed": 9383
+    },
+    {
+      "name": "34-green-bottles",
+      "split": "train",
+      "reference": 46,
+      "cv": 46,
+      "ai": 43,
+      "hybrid": 46,
+      "baseline": {
+        "tp": 46,
+        "fp": 0,
+        "fn": 0,
+        "missing": []
+      },
+      "candidate": {
+        "tp": 46,
+        "fp": 0,
+        "fn": 0,
+        "missing": []
+      },
+      "elapsed": 8695
+    },
+    {
+      "name": "35-blue-bottles",
+      "split": "train",
+      "reference": 41,
+      "cv": 39,
+      "ai": 38,
+      "hybrid": 40,
+      "baseline": {
+        "tp": 39,
+        "fp": 0,
+        "fn": 2,
+        "missing": [
+          "b37",
+          "b41"
+        ]
+      },
+      "candidate": {
+        "tp": 40,
+        "fp": 0,
+        "fn": 1,
+        "missing": [
+          "b41"
+        ]
+      },
+      "elapsed": 11222
+    },
+    {
+      "name": "37-square-52",
+      "split": "val",
+      "reference": 52,
+      "cv": 52,
+      "ai": 16,
+      "hybrid": 52,
+      "baseline": {
+        "tp": 52,
+        "fp": 0,
+        "fn": 0,
+        "missing": []
+      },
+      "candidate": {
+        "tp": 52,
+        "fp": 0,
+        "fn": 0,
+        "missing": []
+      },
+      "elapsed": 8534
+    }
+  ]
+}
