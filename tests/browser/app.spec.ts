@@ -8,8 +8,12 @@ import { positionMetrics } from "../../src/vision/positionMetrics";
 // These exercise the CV fallback and editing UI. Real hybrid inference has its
 // own suite so this regression suite remains deterministic and offline.
 test.beforeEach(async ({ context }) => {
-  await context.route('**/models/config.json',r=>r.fulfill({status:404,body:''}));
-  await context.addInitScript(() => localStorage.setItem("pill-ai-enabled", "false"));
+  await context.route("**/models/config.json", (r) =>
+    r.fulfill({ status: 404, body: "" }),
+  );
+  await context.addInitScript(() =>
+    localStorage.setItem("pill-ai-enabled", "false"),
+  );
 });
 test("JPEG EXIF orientation is applied before overlay coordinates", async ({
   page,
@@ -28,107 +32,108 @@ test("JPEG EXIF orientation is applied before overlay coordinates", async ({
   await expect(page.locator("#image-meta")).toHaveText("480 × 640");
   await expect(page.locator("#count")).toHaveText("24");
 });
-test("camera controls, analysis, numbering, corrections, ROI, debug and local export", async ({
-  page,
-}) => {
-  const errors: string[] = [];
-  page.on("pageerror", (e) => errors.push(e.message));
-  const outgoing: string[] = [];
-  page.on("request", (r) => {
-    const u = new URL(r.url());
-    if (
-      ["http:", "https:"].includes(u.protocol) &&
-      !u.hostname.match(/^(127\.0\.0\.1|localhost)$/) &&
-      !(r.method() === "GET" && u.href === "https://huggingface.co/piky/yolo11/resolve/9ec04d28c48d342906ccaee863a08a6a6394dbc1/yolo11n.onnx")
-    )
-      outgoing.push(r.url());
-  });
-  await page.goto("./?debug=1");
-  await expect(page.locator("#camera")).toHaveAttribute(
-    "capture",
-    "environment",
-  );
-  await page
-    .locator("#file")
-    .setInputFiles("tests/images/01-white-separated.png");
-  await expect(page.locator("#status")).toContainText("解析完了");
-  await expect(page.locator("#count")).toHaveText("24");
-  await expect(page.locator("#list button")).toHaveCount(24);
-  // SW requests bypass route interception on WebKit: disabled model = medium,
-  // failed download = review. Neither path may claim high confidence.
-  await expect(page.locator("#confidence")).toHaveText(/^(中|低・要確認)$/);
-  await page.locator('[data-mode="add"]').click();
-  const canvas = page.locator("#image-canvas");
-  await canvas.scrollIntoViewIfNeeded();
-  const box = (await canvas.boundingBox())!;
-  await canvas.click({
-    position: { x: box.width * 0.88, y: box.height * 0.85 },
-  });
-  await expect(page.locator("#count")).toHaveText("25");
-  await page.locator("#undo").click();
-  await expect(page.locator("#count")).toHaveText("24");
-  await page.locator("#redo").click();
-  await expect(page.locator("#count")).toHaveText("25");
-  await page.locator("#reset-detections").click();
-  await expect(page.locator("#count")).toHaveText("24");
-  await page.locator("#detection-list summary").click();
-  await page.locator("#list button").first().click();
-  await page.locator("#delete-selected").click();
-  await expect(page.locator("#count")).toHaveText("23");
-  await page.locator("#confirmed").check();
-  await expect(page.locator("#count-label")).toHaveText("目視確認済みの個数");
-  await page.locator("#save").click();
-  await expect(page.locator("#status")).toContainText("この端末に保存");
-  const downloadPromise = page.waitForEvent("download");
-  await page.locator("#export").click();
-  const download = await downloadPromise;
-  const stream = await download.createReadStream();
-  let text = "";
-  for await (const part of stream!) text += part.toString();
-  const data = JSON.parse(text);
-  expect(data.records[0].corrected).toHaveLength(23);
-  expect(data.records[0].analysis.detections).toHaveLength(24);
-  expect(data.records[0].original).toMatch(/^data:image\/png;base64,/);
-  expect(data.records[0].confirmed).toBe(true);
-  page.on("dialog", (d) => d.accept());
-  await page.locator("#debug").check();
-  await expect(page.locator("#status")).toContainText("解析完了");
-  await expect(page.locator("#count")).toHaveText("24");
-  await page.locator("#layer").selectOption("Distance transform");
-  await expect(page.locator("#diagnostics")).toContainText("Otsu");
-  await page.locator('[data-mode="roi"]').click();
-  await page.locator("#canvas-wrap").evaluate((el) => {
-    el.scrollTop = 0;
-    el.scrollLeft = 0;
-    el.scrollIntoView({ block: "start" });
-  });
-  const rect = (await canvas.boundingBox())!;
-  await page.mouse.move(
-    rect.x + (rect.width * 15) / 640,
-    rect.y + (rect.height * 15) / 480,
-  );
-  await page.mouse.down();
-  await page.mouse.move(
-    rect.x + (rect.width * 180) / 640,
-    rect.y + (rect.height * 85) / 480,
-    { steps: 10 },
-  );
-  await page.mouse.up();
-  await expect(page.locator("#count")).toHaveText("2");
-  await expect(page.locator("#status")).toContainText("解析完了");
-  await page.locator("#reset-roi").click();
-  await expect(page.locator("#count")).toHaveText("24");
-  expect(outgoing).toEqual([]);
-  expect(errors).toEqual([]);
-  const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth > window.innerWidth + 1,
-  );
-  expect(overflow).toBe(false);
-  await page.screenshot({
-    path: `tests/reports/ui-${test.info().project.name}.png`,
-    fullPage: true,
+test.describe("editing with deterministic CV fallback", () => {
+  test.use({ serviceWorkers: "block" });
+  test("camera controls, analysis, numbering, corrections, ROI, debug and local export", async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    const outgoing: string[] = [];
+    page.on("request", (r) => {
+      const u = new URL(r.url());
+      if (
+        ["http:", "https:"].includes(u.protocol) &&
+        !u.hostname.match(/^(127\.0\.0\.1|localhost)$/)
+      )
+        outgoing.push(r.url());
+    });
+    await page.goto("./?debug=1");
+    await expect(page.locator("#camera")).toHaveAttribute(
+      "capture",
+      "environment",
+    );
+    await page
+      .locator("#file")
+      .setInputFiles("tests/images/01-white-separated.png");
+    await expect(page.locator("#status")).toContainText("解析完了");
+    await expect(page.locator("#count")).toHaveText("24");
+    await expect(page.locator("#list button")).toHaveCount(24);
+    await expect(page.locator("#confidence")).toHaveText("中");
+    await page.locator('[data-mode="add"]').click();
+    const canvas = page.locator("#image-canvas");
+    await canvas.scrollIntoViewIfNeeded();
+    const box = (await canvas.boundingBox())!;
+    await canvas.click({
+      position: { x: box.width * 0.88, y: box.height * 0.85 },
+    });
+    await expect(page.locator("#count")).toHaveText("25");
+    await page.locator("#undo").click();
+    await expect(page.locator("#count")).toHaveText("24");
+    await page.locator("#redo").click();
+    await expect(page.locator("#count")).toHaveText("25");
+    await page.locator("#reset-detections").click();
+    await expect(page.locator("#count")).toHaveText("24");
+    await page.locator("#detection-list summary").click();
+    await page.locator("#list button").first().click();
+    await page.locator("#delete-selected").click();
+    await expect(page.locator("#count")).toHaveText("23");
+    await page.locator("#confirmed").check();
+    await expect(page.locator("#count-label")).toHaveText("目視確認済みの個数");
+    await page.locator("#save").click();
+    await expect(page.locator("#status")).toContainText("この端末に保存");
+    const downloadPromise = page.waitForEvent("download");
+    await page.locator("#export").click();
+    const download = await downloadPromise;
+    const stream = await download.createReadStream();
+    let text = "";
+    for await (const part of stream!) text += part.toString();
+    const data = JSON.parse(text);
+    expect(data.records[0].corrected).toHaveLength(23);
+    expect(data.records[0].analysis.detections).toHaveLength(24);
+    expect(data.records[0].original).toMatch(/^data:image\/png;base64,/);
+    expect(data.records[0].confirmed).toBe(true);
+    page.on("dialog", (d) => d.accept());
+    await page.locator("#debug").check();
+    await expect(page.locator("#status")).toContainText("解析完了");
+    await expect(page.locator("#count")).toHaveText("24");
+    await page.locator("#layer").selectOption("Distance transform");
+    await expect(page.locator("#diagnostics")).toContainText("Otsu");
+    await page.locator('[data-mode="roi"]').click();
+    await page.locator("#canvas-wrap").evaluate((el) => {
+      el.scrollTop = 0;
+      el.scrollLeft = 0;
+      el.scrollIntoView({ block: "start" });
+    });
+    const rect = (await canvas.boundingBox())!;
+    await page.mouse.move(
+      rect.x + (rect.width * 15) / 640,
+      rect.y + (rect.height * 15) / 480,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      rect.x + (rect.width * 180) / 640,
+      rect.y + (rect.height * 85) / 480,
+      { steps: 10 },
+    );
+    await page.mouse.up();
+    await expect(page.locator("#count")).toHaveText("2");
+    await expect(page.locator("#status")).toContainText("解析完了");
+    await page.locator("#reset-roi").click();
+    await expect(page.locator("#count")).toHaveText("24");
+    expect(outgoing).toEqual([]);
+    expect(errors).toEqual([]);
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth + 1,
+    );
+    expect(overflow).toBe(false);
+    await page.screenshot({
+      path: `tests/reports/ui-${test.info().project.name}.png`,
+      fullPage: true,
+    });
   });
 });
+
 test("PWA reload and fresh analysis work with the origin server stopped", async ({
   page,
 }) => {
@@ -318,4 +323,3 @@ test("normal screen has only counting controls; developer panels are absent from
     fullPage: true,
   });
 });
-

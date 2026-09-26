@@ -27,10 +27,11 @@ test("upstream model downloads, verifies, and is reused from device cache", asyn
   const config = JSON.parse(readFileSync("public/models/config.json", "utf8"));
   await context.route(config.modelURL, (r) => r.abort());
   await page.reload();
-  await page.locator("#file").setInputFiles("tests/images/21-yellow-tray-round.png");
+  await page
+    .locator("#file")
+    .setInputFiles("tests/images/21-yellow-tray-round.png");
   await expect(page.locator("#ai-status")).toContainText("全体＋4区画", {
     timeout: 60000,
   });
   await expect(page.locator("#count")).toHaveText("12");
 });
-
