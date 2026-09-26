@@ -21,12 +21,7 @@ for (const [id, target, count] of [
       }),
     );
     await page.locator("#target").selectOption(target);
-    if (target === "pill") {
-      await page.locator("#ai-enabled").check();
-      await expect(page.locator("#status")).toContainText("解析完了", {
-        timeout: 120000,
-      });
-    }
+
     await page.locator("#file").setInputFiles(`work/september-18/${id}.jpg`);
     await expect(page.locator("#status")).toContainText("解析完了", {
       timeout: 120000,
@@ -49,6 +44,7 @@ for (const [id, target, count] of [
 test.use({ serviceWorkers: "block", timezoneId: "Asia/Tokyo" });
 
 test.beforeEach(async ({ context, page }) => {
+  await context.route('**/models/config.json',r=>r.fulfill({status:404,body:''}));
   await context.addInitScript(() => {
     localStorage.setItem("pill-ai-enabled", "false");
     Object.defineProperty(window, "showSaveFilePicker", {

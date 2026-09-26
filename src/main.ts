@@ -3,7 +3,8 @@ import "./pictokun.css";
 import { parameterHTML, readParameters } from "./components/Parameters";
 import { ImageViewer, type Mode } from "./components/ImageViewer";
 import { ResultExport } from "./components/ResultExport";
-import { LearningPanel } from "./components/LearningPanel";
+import { AutoLearning } from "./components/AutoLearning";
+import { imageHash } from "./learningStore";
 import { ResultZoom } from "./components/ResultZoom";
 import { ComicGuide } from "./components/ComicGuide";
 import { loadImage } from "./image";
@@ -16,17 +17,11 @@ import type {
   WorkerResponse,
 } from "./types";
 
-let aiEnabled = true;
-try {
-  aiEnabled = localStorage.getItem("pill-ai-enabled") !== "false";
-} catch {
-  /* Storage may be unavailable. */
-}
 const developerMode = new URLSearchParams(location.search).get("debug") === "1";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 <header class="app-header"><img class="pictokun" src="${import.meta.env.BASE_URL}pictokun.png" alt="" width="96" height="96"><div class="brand-copy"><h1>錠数ノート</h1><button id="open-guide" class="guide-button">漫画で使い方を見る <span aria-hidden="true">↗</span></button></div><span class="local">端末内で解析</span></header>
-<main><section class="upload-panel"><label class="field">数える対象<select id="target"><option value="pill">錠剤</option><option value="bottle">点眼ボトル</option></select></label><p id="target-guide" class="guide">錠剤専用AIで補助します。</p><div class="input-buttons"><label class="button primary" for="camera">撮影<input id="camera" type="file" accept="image/*" capture="environment"></label><label class="button secondary" for="file">写真を選択<input id="file" type="file" accept="image/*"></label></div><label class="check"><input id="ai-enabled" type="checkbox" ${aiEnabled ? "checked" : ""}>AI併用 <span id="ai-model-label" class="model-label">錠剤用</span></label><p class="privacy">写真は送信されません。</p></section>
+<main><section class="upload-panel"><label class="field">数える対象<select id="target"><option value="pill">錠剤</option><option value="bottle">点眼ボトル</option></select></label><p id="target-guide" class="guide">錠剤専用AIで解析します。</p><div class="input-buttons"><label class="button primary" for="camera">撮影<input id="camera" type="file" accept="image/*" capture="environment"></label><label class="button secondary" for="file">写真を選択<input id="file" type="file" accept="image/*"></label></div><p class="privacy">写真は送信されません。</p></section>
 <div id="status" class="status" role="status" aria-live="polite">写真を選ぶと解析を開始します。</div><button id="cancel" class="text-button" hidden>解析を中止</button>
 <div class="workspace"><section class="viewer-panel"><div class="panel-heading"><h2>検出画像</h2><span id="image-meta">未選択</span></div>
 <div id="empty" class="empty"><div class="frame-mark">＋</div><h3>数える対象の写真を読み込む</h3><button id="demo" class="text-button">合成サンプルで試す →</button></div>
@@ -39,15 +34,20 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 </section>
 <aside><section class="result-panel"><p class="eyebrow" id="count-label">自動検出</p><div class="count"><span id="count">—</span><span class="unit">錠</span></div><div class="result-export"><button id="save-result-image" class="button primary full" disabled>結果画像を保存</button><p id="result-export-status" class="muted" role="status">計数後に保存できます。</p><button id="download-result-image" hidden disabled>ファイルとして保存</button></div><div class="confidence-row"><span>信頼度</span><strong id="confidence" class="badge neutral">未解析</strong></div><p id="auto-count" class="muted"></p><p id="ai-summary" class="ai-summary"></p><details><summary>解析情報</summary><p id="ai-status" class="muted"></p><ul id="reasons"></ul><p id="analysis-info" class="muted">未解析</p></details><div id="votes" class="votes" ${developerMode ? "" : "hidden"}></div><label class="confirm"><input id="confirmed" type="checkbox" disabled>すべての番号と数え漏れを目視確認した</label><p class="disclaimer">最終確認は、番号と実物を見比べてください。</p></section>
 <section class="settings-panel" ${developerMode ? "" : "hidden"}><h2>解析設定</h2><label class="field">撮影環境<select id="scene"><option value="tray">黒い計数トレー</option><option value="desk">机・その他の背景</option><option value="bag">透明な分包袋</option></select></label><label class="check"><input id="auto-roi" type="checkbox" checked>黒いトレーの範囲を自動推定</label><label class="check"><input id="debug" type="checkbox">解析表示</label><div id="debug-controls" hidden><label class="field">表示する画像<select id="layer"><option>Original</option><option>Foreground mask</option><option>ROI</option><option>Grayscale</option><option>Threshold</option><option>Morphology</option><option>Markers</option><option>Distance transform</option><option>Watershed</option><option>Contours</option><option selected>Final detections</option></select></label><p id="diagnostics" class="muted"></p></div>${parameterHTML}<label class="field">解析解像度<select id="resolution"><option value="2048">高精度・長辺2048px（標準）</option><option value="3072">長辺3072px</option><option value="10000">元解像度（上限600万画素）</option></select></label><button id="analyze" class="button secondary full" disabled>この設定で再解析</button></section></aside></div>
-<section id="learning-panel" class="learning-panel"></section>
+<p id="auto-learning-status" class="muted"></p>
 <section class="data-panel" ${developerMode ? "" : "hidden"}><div><h2>検証データ</h2><p>元画像・自動検出・訂正後の結果を、このブラウザ内に保存します。</p><small>元画像には袋の印字も含まれます。書き出す前に内容を確認してください。</small></div><div class="data-actions"><button id="save" disabled>この結果を端末に保存</button><button id="export">検証データを書き出す</button><button id="clear" class="text-button">保存データを削除</button></div></section>
-<footer>錠数ノート v0.10.0 <a href="https://github.com/kaeru7787-hash/pill-counter/archive/refs/heads/main.zip">ソースコードZIP</a><span id="offline">オフライン準備中</span></footer></main>`;
+<footer>錠数ノート v0.11.0 <a href="https://github.com/kaeru7787-hash/pill-counter/archive/refs/heads/main.zip">ソースコードZIP</a><span id="offline">オフライン準備中</span></footer></main>`;
 const $ = <T extends HTMLElement = HTMLElement>(s: string) =>
   document.querySelector<T>(s)!;
 const comicGuide = new ComicGuide($("#open-guide"));
 const viewer = new ImageViewer($<HTMLCanvasElement>("#image-canvas"));
 const resultZoom = new ResultZoom(viewer);
-const resultExport = new ResultExport(viewer, $<HTMLButtonElement>("#save-result-image"), $<HTMLButtonElement>("#download-result-image"), $("#result-export-status"));
+const resultExport = new ResultExport(
+  viewer,
+  $<HTMLButtonElement>("#save-result-image"),
+  $<HTMLButtonElement>("#download-result-image"),
+  $("#result-export-status"),
+);
 $("#open-result-zoom").onclick = () => resultZoom.open($("#open-result-zoom"));
 let image: Raster | undefined,
   original: File | undefined,
@@ -60,11 +60,11 @@ let revision = 0,
   confirmed = false,
   originalWidth = 0,
   originalHeight = 0,
-  recordID = crypto.randomUUID();
+  recordID: string = crypto.randomUUID();
 let timer: ReturnType<typeof setTimeout> | undefined;
 const settings = (): Settings => ({
   target: $<HTMLSelectElement>("#target").value as Settings["target"],
-  useAI: $<HTMLInputElement>("#ai-enabled").checked,
+  useAI: true,
   scene: $<HTMLSelectElement>("#scene").value as Settings["scene"],
   autoROI: $<HTMLInputElement>("#auto-roi").checked,
   debug: $<HTMLInputElement>("#debug").checked,
@@ -72,24 +72,14 @@ const settings = (): Settings => ({
   parameters: readParameters(),
 });
 let analyzedSettings: Settings | undefined;
-const learningPanel = new LearningPanel($("#learning-panel"), () =>
-  image && viewer.original && result && analyzedSettings ? {
-    original: viewer.original, image, result, corrected: viewer.detections,
-    settings: analyzedSettings, confirmed,
-  } : undefined,
-  p => viewer.onAdd(p),
-  id => { viewer.selected = id; render(); resultZoom.open($("#open-result-zoom")); },
-);
+const learner = new AutoLearning($("#auto-learning-status"));
 function status(message: string, error = false) {
   $("#status").textContent = message;
   $("#status").classList.toggle("error", error);
 }
 function setBusy(value: boolean) {
   busy = value;
-  learningPanel.update(value);
   resultExport.setBusy(value || !result);
-  $<HTMLInputElement>("#ai-enabled").disabled =
-    value;
   $<HTMLSelectElement>("#target").disabled = value;
   $("#cancel").hidden = !value;
   for (const id of ["analyze", "reset-roi"])
@@ -109,6 +99,7 @@ function changed() {
   $<HTMLInputElement>("#confirmed").checked = false;
   viewer.selected = undefined;
   render();
+  if (image && result) learner.stage(image, result, viewer.detections);
 }
 function checkpoint() {
   future = [];
@@ -117,7 +108,6 @@ function checkpoint() {
 }
 function render() {
   viewer.draw();
-  learningPanel.update(busy);
   $<HTMLButtonElement>("#undo").disabled = !history.length || busy;
   $<HTMLButtonElement>("#delete-selected").disabled = !viewer.selected || busy;
   if (!result) return;
@@ -159,7 +149,13 @@ function render() {
   ].join(" · ");
   $("#ai-status").textContent =
     `${result.algorithm || "画像処理"} / ${result.aiStatus || "AI未導入"}`;
-  $("#ai-summary").textContent = !analyzedSettings?.useAI ? "AI OFF" : result.counts.AI !== undefined ? (analyzedSettings?.target === "bottle" ? "点眼専用AIで補助（試作）" : "錠剤専用AIで補助") : "AI未使用・画像処理のみ";
+  $("#ai-summary").textContent = !analyzedSettings?.useAI
+    ? "AI OFF"
+    : result.counts.AI !== undefined
+      ? analyzedSettings?.target === "bottle"
+        ? "点眼専用AIで補助（試作）"
+        : "錠剤専用AIで補助"
+      : "AI未使用・画像処理のみ";
   $("#analysis-info").textContent = [
     `v${result.version}`,
     `${image?.width} × ${image?.height}`,
@@ -261,13 +257,20 @@ async function run() {
     status(String(e), true);
     return;
   }
+  const pendingImage = image,
+    pendingRevision = revision;
+  await learner.ready;
+  if (image !== pendingImage || revision !== pendingRevision) return false;
+  learner.finish();
   worker?.terminate();
   clearTimeout(timer);
   const id = ++revision;
   setBusy(true);
   status(
     runSettings.target === "bottle"
-      ? (runSettings.useAI ? "点眼専用AIと画像処理で解析しています…" : "キャップを画像処理で解析しています…")
+      ? runSettings.useAI
+        ? "点眼専用AIと画像処理で解析しています…"
+        : "キャップを画像処理で解析しています…"
       : runSettings.useAI
         ? "画像処理とAIで解析しています…（初回はモデルを取得）"
         : "画像を解析しています…",
@@ -302,6 +305,7 @@ async function run() {
       fail(event.data.error);
       return;
     }
+    learner.begin(recordID, runSettings.target || "pill");
     result = event.data.result!;
     analyzedSettings = runSettings;
     viewer.analysis = result;
@@ -320,6 +324,7 @@ async function run() {
     image,
     settings: runSettings,
     baseURL: new URL(import.meta.env.BASE_URL, location.href).href,
+    learningModel: learner.model(runSettings.target || "pill"),
   });
   return true;
 }
@@ -335,11 +340,17 @@ async function open(file: File) {
       Number($<HTMLSelectElement>("#resolution").value),
     );
     if (loadID !== revision) return;
+    const photoID = await imageHash(loaded.canvas);
+    if (loadID !== revision) return;
+    learner.finish();
+    if (viewer.original) {
+      viewer.original.width = viewer.original.height = 1;
+    }
     original = file;
     image = loaded.image;
     originalWidth = loaded.originalWidth;
     originalHeight = loaded.originalHeight;
-    recordID = crypto.randomUUID();
+    recordID = photoID;
     result = undefined;
     history = [];
     future = [];
@@ -560,22 +571,12 @@ if ("serviceWorker" in navigator && import.meta.env.PROD)
       $("#offline").textContent = "オフライン準備未完了";
     });
 else $("#offline").textContent = "開発モード";
-$<HTMLInputElement>("#ai-enabled").onchange = () => {
-  try {
-    localStorage.setItem(
-      "pill-ai-enabled",
-      String($<HTMLInputElement>("#ai-enabled").checked),
-    );
-  } catch {}
-  void run();
-};
 
 function syncTargetUI() {
   const bottle = $<HTMLSelectElement>("#target").value === "bottle";
   $("#target-guide").textContent = bottle
-    ? "点眼専用AIで補助します（少数写真で学習した試作）。"
+    ? "点眼専用AIで解析します。"
     : "錠剤専用AIで補助します。";
-  $("#ai-model-label").textContent = bottle ? "点眼用" : "錠剤用";
   $("#empty h3").textContent = bottle
     ? "点眼ボトルの写真を読み込む"
     : "錠剤の写真を読み込む";

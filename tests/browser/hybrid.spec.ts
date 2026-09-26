@@ -33,7 +33,7 @@ for (const [file, truth] of cases)
       }),
     );
     await page.goto("./?debug=1");
-    await expect(page.locator("#ai-enabled")).toBeChecked();
+    await expect(page.locator("#ai-enabled")).toHaveCount(0);
     // Optional exact camera JPEGs exercise decoding/EXIF as well as inference.
     const jpeg =
       process.env.PILL_ORIGINALS &&
@@ -107,7 +107,7 @@ for (const [file, truth] of cases)
     ).toBe(output.detected);
   });
 
-test("failed AI request falls back visibly; switch can disable AI", async ({
+test("failed AI request falls back visibly; AI stays automatic", async ({
   page,
   context,
 }) => {
@@ -120,7 +120,7 @@ test("failed AI request falls back visibly; switch can disable AI", async ({
   await expect(page.locator("#ai-status")).toContainText("AI照合失敗");
   await expect(page.locator("#count")).toHaveText("24");
   await expect(page.locator("#confidence")).toContainText("要確認");
-  await page.locator("#ai-enabled").uncheck();
-  await expect(page.locator("#ai-status")).toContainText("AI併用OFF");
+  await expect(page.locator("#ai-enabled")).toHaveCount(0);
+
   await expect(page.locator("#count")).toHaveText("24");
 });

@@ -11,9 +11,9 @@ test("target selector, bottle worker, units and pill AI preference", async ({
   await context.route(config.modelURL, (r) => r.abort());
   await context.route("**/models/bottle-config.json", (r) => r.fulfill({status:404,body:""}));
   await page.goto("./");
-  await expect(page.locator("#ai-enabled")).toBeChecked();
+  await expect(page.locator("#ai-enabled")).toHaveCount(0);
   await page.locator("#target").selectOption("bottle");
-  await expect(page.locator("#ai-enabled")).toBeEnabled();
+  await expect(page.locator("#ai-enabled")).toHaveCount(0);
   const svg =
     '<svg width="800" height="600"><rect width="800" height="600" fill="#696969"/>' +
     [140, 350, 560]
@@ -40,10 +40,10 @@ test("target selector, bottle worker, units and pill AI preference", async ({
   await expect(page.locator("#status")).toContainText("解析完了", {
     timeout: 150000,
   });
-  await expect(page.locator("#ai-enabled")).toBeChecked();
+  await expect(page.locator("#ai-enabled")).toHaveCount(0);
   await expect(page.locator(".unit")).toHaveText("錠");
   await expect(page.locator("#target")).toHaveValue("pill");
-  await expect(page.locator("#ai-enabled")).toBeEnabled();
+  await expect(page.locator("#ai-enabled")).toHaveCount(0);
   await page.locator('[data-mode="add"]').click();
   await page.locator("#image-canvas").click({ position: { x: 30, y: 30 } });
   const previousCount = await page.locator("#count").textContent();
@@ -52,7 +52,7 @@ test("target selector, bottle worker, units and pill AI preference", async ({
   await expect(page.locator("#target")).toHaveValue("pill");
   await expect(page.locator("#count")).toHaveText(previousCount!);
   await expect(page.locator(".unit")).toHaveText("錠");
-  await expect(page.locator("#ai-enabled")).toBeEnabled();
+  await expect(page.locator("#ai-enabled")).toHaveCount(0);
 });
 // Blue remains a documented 39/41 development case, not an exact-count success.
 for (const [name, target, count] of [

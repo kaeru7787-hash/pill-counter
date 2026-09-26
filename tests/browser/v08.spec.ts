@@ -5,7 +5,7 @@ import { positionMetrics } from "../../src/vision/positionMetrics";
 test.use({ serviceWorkers: "block" });
 
 test("adjacent rectangular caps and visible analysis version", async ({
-  page,
+  page, context,
 }) => {
   const centers = Array.from({ length: 16 }, (_, i) => ({
     x: 90 + (i % 8) * 58,
@@ -22,7 +22,7 @@ test("adjacent rectangular caps and visible analysis version", async ({
     "</svg>";
   await page.goto("./");
   await page.locator("#target").selectOption("bottle");
-  await page.locator("#ai-enabled").uncheck();
+  await context.route('**/models/bottle-config.json',r=>r.fulfill({status:404,body:''}));
   await page
     .locator("#file")
     .setInputFiles({
@@ -33,7 +33,7 @@ test("adjacent rectangular caps and visible analysis version", async ({
   await expect(page.locator("#status")).toContainText("解析完了");
   await expect(page.locator("#count")).toHaveText("16");
   await page.getByText("解析情報", { exact: true }).click();
-  await expect(page.locator("#analysis-info")).toContainText("v0.10.0");
+  await expect(page.locator("#analysis-info")).toContainText("v0.11.0");
   await expect(page.locator("#analysis-info")).toContainText(
     "写真内の形状基準 有効",
   );

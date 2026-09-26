@@ -68,11 +68,13 @@ export type Analysis = {
   estimatedDiameter?: number;
   candidates?: Detection[];
   rejectedCandidates?: Detection[];
+  learning?: {updates:number;added:number;removed:number};
 };
 export type WorkerRequest = {
   id: number;
   image: Raster;
   settings: Settings;
   baseURL: string;
+  learningModel?: import('../autoLearning').LocalModel;
 };
 export type WorkerResponse = { id: number; result?: Analysis; error?: string };
