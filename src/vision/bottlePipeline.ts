@@ -2,6 +2,8 @@ import type { Analysis, Detection, Raster, Settings } from "../types";
 import { getCV } from "./opencv";
 import { clampROI } from "./pipeline";
 import { contours } from "./shapeFilter";
+import { repeatedCapRegions, type RegionView } from "./capRegions";
+import { recoverTiltedCaps } from "./tiltedCaps";
 
 /** Cap-only counter. The pill model is deliberately not used for bottles. */
 export async function analyzeBottles(
@@ -70,6 +72,10 @@ export async function analyzeBottles(
       region: boolean;
     };
     const proposals: Cap[] = [];
+    const stages: Record<string, number> = {};
+    const reject = (reason: string) => {
+      stages[reason] = (stages[reason] || 0) + 1;
+    };
     const at = (m: any, x: number, y: number) =>
       m.data[
         Math.max(0, Math.min(h - 1, Math.round(y))) * w +
@@ -140,7 +146,10 @@ export async function analyzeBottles(
         edge += Math.min(60, strongest);
         if (strongest > 12) sectors++;
       }
-      if (sectors < 15 || edge / 24 < 18) return;
+      if (sectors < 15 || edge / 24 < 18) {
+        reject("輪郭不足");
+        return;
+      }
       proposals.push({
         x,
         y,
@@ -175,12 +184,22 @@ export async function analyzeBottles(
     // Closed, compact color regions provide centers even when a weak rim is
     // missed by Hough. Multiple value thresholds avoid one lighting cutoff.
     const mask = keep(cv.Mat.zeros(h, w, cv.CV_8UC1));
+    const regionViews: RegionView[] = [];
     for (let threshold = 105; threshold <= 240; threshold += 10) {
       for (let i = 0; i < w * h; i++)
         mask.data[i] =
           hsv.data[i * 3 + 1] > 65 && hsv.data[i * 3 + 2] > threshold ? 255 : 0;
       for (const d of contours(cv, mask, "cap-region")) {
         const r = Math.sqrt(d.area / Math.PI);
+        if (
+          r >= minRadius &&
+          r <= maxRadius &&
+          d.shape &&
+          d.shape.circularity > 0.62 &&
+          d.shape.solidity > 0.88 &&
+          d.shape.aspect < 2.3
+        )
+          regionViews.push({ detection: d, threshold });
         if (
           r < minRadius ||
           r > maxRadius ||
@@ -265,14 +284,18 @@ export async function analyzeBottles(
           p.saturation < referenceSaturation * 0.6 ||
           !hues.some((h) => hueDistance(p.hue, h) < 0.3) ||
           p.value < typicalValue(p.hue) * 0.8)
-      )
+      ) {
+        reject("代表形状・色の不一致");
         continue;
+      }
       if (
         kept.some(
           (q) => Math.hypot(p.x - q.x, p.y - q.y) < Math.max(p.r, q.r) * 1.75,
         )
-      )
+      ) {
+        reject("近接候補の重複除去");
         continue;
+      }
       kept.push(p);
     }
     // Some caps have a repeated contrasting seal. Enable this evidence only
@@ -288,7 +311,8 @@ export async function analyzeBottles(
       )
         marksMask.data[i] = 255;
     }
-    const marks = contours(cv, marksMask, "seal").filter(
+    const sealRegions = contours(cv, marksMask, "seal");
+    const marks = sealRegions.filter(
       (d) =>
         d.area > radius * radius * 0.012 &&
         d.area < radius * radius * 0.5 &&
@@ -299,6 +323,8 @@ export async function analyzeBottles(
       Math.hypot(p.x - m.center.x, p.y - m.center.y) < p.r * 1.05;
     const strongKept = kept.filter((p) => p.score > 2.8);
     let finalCaps = kept;
+    let tilted: Detection[] = [];
+    let unresolvedSeals = 0;
     if (
       Math.abs(hue) > 2 &&
       strongKept.length >= 8 &&
@@ -327,8 +353,25 @@ export async function analyzeBottles(
           supported.push(best);
       }
       finalCaps = supported;
+      // A tilted seal is often narrow and fails the upright shape filter.
+      // Broader regions can trigger local inspection, never a count by themselves.
+      const unmatched = sealRegions.filter(
+        (m) =>
+          m.area > radius * radius * 0.012 &&
+          m.area < radius * radius * 0.5 &&
+          m.shape!.solidity > 0.4 &&
+          m.shape!.aspect < 8 &&
+          !supported.some((p) => sealNear(p, m)),
+      );
+      tilted = recoverTiltedCaps(cv, gray, hsv, unmatched, radius, hue).filter(
+        (d) =>
+          !supported.some(
+            (p) => Math.hypot(p.x - d.center.x, p.y - d.center.y) < radius,
+          ),
+      );
+      unresolvedSeals = Math.max(0, unmatched.length - tilted.length);
     }
-    const detections: Detection[] = finalCaps
+    let detections: Detection[] = finalCaps
       .sort((a, b) => a.y - b.y || a.x - b.x)
       .map((p, i) => {
         const x = roi.x + p.x / scale,
@@ -348,8 +391,54 @@ export async function analyzeBottles(
           score: p.score / 3,
         };
       });
+    const regions = repeatedCapRegions(regionViews);
+    if (regions.enabled) {
+      detections = regions.detections.map((d) => ({
+        ...d,
+        center: {
+          x: roi.x + d.center.x / scale,
+          y: roi.y + d.center.y / scale,
+        },
+        box: {
+          x: roi.x + d.box.x / scale,
+          y: roi.y + d.box.y / scale,
+          width: d.box.width / scale,
+          height: d.box.height / scale,
+        },
+        area: d.area / (scale * scale),
+        contour: d.contour.map((p) => ({
+          x: roi.x + p.x / scale,
+          y: roi.y + p.y / scale,
+        })),
+      }));
+    }
+    if (!regions.enabled)
+      detections.push(
+        ...tilted.map((d) => ({
+          ...d,
+          center: {
+            x: roi.x + d.center.x / scale,
+            y: roi.y + d.center.y / scale,
+          },
+          box: {
+            x: roi.x + d.box.x / scale,
+            y: roi.y + d.box.y / scale,
+            width: d.box.width / scale,
+            height: d.box.height / scale,
+          },
+          area: d.area / (scale * scale),
+          contour: d.contour.map((p) => ({
+            x: roi.x + p.x / scale,
+            y: roi.y + p.y / scale,
+          })),
+        })),
+      );
+    detections.sort(
+      (a, b) => a.center.y - b.center.y || a.center.x - b.center.x,
+    );
+    detections = detections.map((d, i) => ({ ...d, id: `cap-${i + 1}` }));
     return {
-      version: "0.7.0",
+      version: "0.8.0",
       width: image.width,
       height: image.height,
       roi,
@@ -364,12 +453,40 @@ export async function analyzeBottles(
         reasons: [
           "点眼ボトルの試験モードです。キャップ1個を1本として数えます。",
           "横倒し・重なり・透明や白いキャップは見逃す場合があります。番号を確認してください。",
+          ...(unresolvedSeals
+            ? [
+                `輪郭を確定できない封印候補が${unresolvedSeals}か所あります。横倒し部分を確認してください（本数には未加算）。`,
+              ]
+            : []),
         ],
       },
       elapsed: performance.now() - start,
       debug: {},
+      candidates: settings.debug
+        ? proposals.map((p, i) => ({
+            id: `proposal-${i}`,
+            center: { x: roi.x + p.x / scale, y: roi.y + p.y / scale },
+            box: {
+              x: roi.x + (p.x - p.r) / scale,
+              y: roi.y + (p.y - p.r) / scale,
+              width: (2 * p.r) / scale,
+              height: (2 * p.r) / scale,
+            },
+            area: Math.PI * (p.r / scale) ** 2,
+            contour: [],
+            source: "cv" as const,
+            score: p.score,
+            flags: [p.region ? "region" : "hough"],
+          }))
+        : undefined,
       diagnostics: [
         `キャップ候補 ${proposals.length} / 採用 ${detections.length}`,
+        `非円形の安定領域 ${regions.stable} / 写真内の形状基準 ${regions.enabled ? "有効" : "保留"} / 形状照合で補完 ${regions.recovered || 0}`,
+        `傾斜キャップの局所復元 ${tilted.length} / 未確定の封印候補 ${unresolvedSeals}`,
+        ...Object.entries(stages).map(
+          ([stage, n]) => `円形候補・${stage}: ${n}`,
+        ),
+        `代表半径 ${radius.toFixed(1)}`,
       ],
       algorithm: "点眼ボトル・色付きキャップ検出",
       aiStatus: "点眼ボトルは専用画像処理で解析（錠剤用AIは適用しません）",
