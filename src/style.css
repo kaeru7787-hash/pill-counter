@@ -655,3 +655,6 @@ summary {
     max-height: 65vh;
   }
 }
+
+.result-export { margin: 16px 0 24px; }
+.result-export p { margin: 8px 0; font-size: 12px; }
