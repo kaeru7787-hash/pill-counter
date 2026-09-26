@@ -77,11 +77,17 @@ test("numbered image zoom, pan, pinch and close preserve corrections", async ({
   await dialog.getByRole("button", { name: "拡大画像を閉じる" }).click();
   await expect(dialog).not.toBeVisible();
   await expect(open).toBeFocused();
-  expect(await page.evaluate(() => document.body.style.overflow)).toBe("");
+  // Native dialog close queues the cleanup event after visibility/focus change.
+  await expect
+    .poll(() => page.evaluate(() => document.body.style.overflow))
+    .toBe("");
   await page.locator("#undo").click();
   await expect(page.locator("#count")).toHaveText("24");
   await open.click();
   await expect(dialog.locator("output")).toHaveText("100%");
   await page.keyboard.press("Escape");
   await expect(dialog).not.toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => document.body.style.overflow))
+    .toBe("");
 });
