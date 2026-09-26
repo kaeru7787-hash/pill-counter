@@ -7,6 +7,7 @@ import {
 } from "./candidateReview";
 import type { AICandidate } from "./onnxDetector";
 import { iou } from "./onnxDetector";
+import { pixelReference, pixelRejection } from "./pixelEvidence";
 export function sameObject(a: Detection, b: Detection) {
   return (
     iou(a.box, b.box) > 0.3 &&
@@ -31,7 +32,25 @@ export function fuse(
     if (!stable.some((b) => sameObject(a, b))) stable.push(a);
   const profile = referenceProfile(cv, stable, image);
   const rejected: Detection[] = [];
+  const references = cv.filter(
+    (c) =>
+      c.shape &&
+      c.shape.solidity > 0.9 &&
+      c.shape.circularity > 0.65 &&
+      c.area > profile.area * 0.65 &&
+      c.area < profile.area * 1.5 &&
+      stable.some((a) => associated(c, a)),
+  );
+  const pixels = image ? pixelReference(image, references) : undefined;
+  const veto = (d: Detection, neighbors: Detection[] = []) => {
+    const reasons =
+      image && pixels ? pixelRejection(image, d, pixels, neighbors) : [];
+    if (reasons.length)
+      rejected.push({ ...d, flags: [...d.flags, ...reasons] });
+    return reasons.length > 0;
+  };
   const accepted = cv.filter((c) => {
+    if (veto(c, references)) return false;
     if (stable.some((a) => associated(c, a))) return true;
     const reasons = anomalyReasons(c, profile, image);
     const tiny =
@@ -75,6 +94,7 @@ export function fuse(
   const detections = [...accepted];
   for (const [index, a] of stable.entries()) {
     const group = groups[index];
+    if (veto(a, accepted)) continue;
     // Merge only a small split fragment and its partial parent, not two full
     // sized touching pills. Ambiguous groups remain available for review.
     if (
