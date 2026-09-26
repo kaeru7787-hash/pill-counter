@@ -1,0 +1,47 @@
+import {test,expect} from '@playwright/test';
+import {existsSync} from 'node:fs';
+test('comic opens under service worker, scrolls, closes and preserves edits',async({page,context})=>{
+ await context.addInitScript(()=>localStorage.setItem('pill-ai-enabled','false'));
+ await page.goto('./');
+ if(test.info().project.name==='chromium')await page.evaluate(async()=>{await navigator.serviceWorker.ready;});
+ await page.reload();
+ await page.locator('#file').setInputFiles('tests/images/01-white-separated.png');
+ await expect(page.locator('#status')).toContainText('解析完了');
+ await page.locator('[data-mode="add"]').click();
+ const box=(await page.locator('#image-canvas').boundingBox())!;
+ await page.locator('#image-canvas').click({position:{x:box.width*.88,y:box.height*.85}});
+ await expect(page.locator('#count')).toHaveText('25');
+ await page.locator('#open-guide').click();
+ const dialog=page.locator('.comic-dialog');await expect(dialog).toBeVisible();
+ const guide=page.frameLocator('iframe[title="操作方法の縦スクロール漫画"]');
+ await expect(guide.locator('img')).toHaveCount(3);
+ await expect(guide.locator('#count img')).toHaveAttribute('alt',/点眼それぞれの専用AI/);
+ await expect.poll(()=>guide.locator('#count img').evaluate((el:any)=>el.complete&&el.naturalWidth>0)).toBe(true);
+ await guide.getByRole('link',{name:'③ 確認・保存'}).click();
+ await expect(guide.locator('#save')).toBeInViewport();
+ await page.screenshot({path:`tests/reports/v010-comic-${test.info().project.name}.png`});
+ await dialog.getByRole('button',{name:'漫画を閉じる'}).click();
+ await expect(dialog).not.toBeVisible();await expect(page.locator('#count')).toHaveText('25');
+ await page.locator('#open-guide').click();await page.keyboard.press('Escape');await expect(dialog).not.toBeVisible();
+ await expect(page.locator('#open-guide')).toBeFocused();
+ await page.screenshot({path:`tests/reports/v010-app-${test.info().project.name}.png`,fullPage:true});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+test.describe('bottle inference',()=>{
+test.use({serviceWorkers:'block'});
+test('bottle mode uses the shipped dedicated ONNX; AI OFF and fallback stay editable',async({page,context})=>{
+ test.skip(!process.env.BOTTLE_REAL||!existsSync('work/originals/35-blue-bottles.jpeg'),'Private prototype photo');test.setTimeout(180000);
+ const urls:string[]=[];page.on('request',r=>urls.push(r.url()));
+ await page.goto('./');await page.locator('#target').selectOption('bottle');
+ await expect(page.locator('#ai-enabled')).toBeEnabled();await page.locator('#ai-enabled').check();
+ await page.locator('#file').setInputFiles('work/originals/35-blue-bottles.jpeg');
+ await expect(page.locator('#status')).toContainText('解析完了',{timeout:150000});
+ await expect(page.locator('#count')).toHaveText('40');await expect(page.locator('#ai-summary')).toContainText('点眼専用AI');
+ expect(urls.some(u=>u.includes('eyedrop-bottle.onnx'))).toBe(true);expect(urls.some(u=>u.includes('huggingface'))).toBe(false);
+ await page.locator('#ai-enabled').uncheck();await expect(page.locator('#status')).toContainText('解析完了');
+ await expect(page.locator('#count')).toHaveText('39');await expect(page.locator('#ai-summary')).toHaveText('AI OFF');
+ await context.route('**/models/bottle-config.json',r=>r.fulfill({status:404,body:''}));
+ await page.locator('#ai-enabled').check();await expect(page.locator('#status')).toContainText('解析完了');
+ await expect(page.locator('#ai-summary')).toContainText('画像処理のみ');await expect(page.locator('[data-mode="add"]')).toBeEnabled();
+});
+});

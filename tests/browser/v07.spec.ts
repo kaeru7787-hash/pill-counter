@@ -9,10 +9,11 @@ test("target selector, bottle worker, units and pill AI preference", async ({
 }) => {
   const config = JSON.parse(readFileSync("public/models/config.json", "utf8"));
   await context.route(config.modelURL, (r) => r.abort());
+  await context.route("**/models/bottle-config.json", (r) => r.fulfill({status:404,body:""}));
   await page.goto("./");
   await expect(page.locator("#ai-enabled")).toBeChecked();
   await page.locator("#target").selectOption("bottle");
-  await expect(page.locator("#ai-enabled")).toBeDisabled();
+  await expect(page.locator("#ai-enabled")).toBeEnabled();
   const svg =
     '<svg width="800" height="600"><rect width="800" height="600" fill="#696969"/>' +
     [140, 350, 560]
@@ -33,7 +34,7 @@ test("target selector, bottle worker, units and pill AI preference", async ({
   await expect(page.locator("#count")).toHaveText("3");
   await expect(page.locator(".unit")).toHaveText("本");
   await expect(page.locator("#ai-status")).toContainText(
-    "錠剤用AIは適用しません",
+    "点眼AIを利用できません",
   );
   await page.locator("#target").selectOption("pill");
   await expect(page.locator("#status")).toContainText("解析完了", {
