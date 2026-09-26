@@ -107,14 +107,14 @@ export class ImageViewer {
       );
     });
   }
-  draw() {
+  draw(c = this.canvas, finalOnly = false) {
     if (!this.original) return;
-    const c = this.canvas;
     c.width = this.original.width;
     c.height = this.original.height;
     const ctx = c.getContext("2d")!;
     ctx.drawImage(this.original, 0, 0);
-    const debug = this.analysis?.debug[this.layer];
+    const layer = finalOnly ? "Final detections" : this.layer;
+    const debug = finalOnly ? undefined : this.analysis?.debug[layer];
     if (debug) {
       const off = document.createElement("canvas");
       off.width = debug.width;
@@ -135,12 +135,12 @@ export class ImageViewer {
       const origin = debug.origin || this.analysis!.roi;
       ctx.drawImage(off, origin.x, origin.y);
     }
-    if (["Final detections", "Contours"].includes(this.layer))
-      (this.layer === "Contours"
+    if (["Final detections", "Contours"].includes(layer))
+      (layer === "Contours"
         ? this.analysis?.candidates || this.detections
         : this.detections
       ).forEach((d, i) => {
-        const selected = d.id === this.selected;
+        const selected = !finalOnly && d.id === this.selected;
         ctx.beginPath();
         d.contour.forEach((p, j) =>
           j ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y),
@@ -151,13 +151,19 @@ export class ImageViewer {
           ? "#ffcf60"
           : d.source === "manual"
             ? "#67b8ff"
-            : "#39e0bc";
-        ctx.fillStyle = selected ? "#ffcf6044" : "#24d9aa19";
+            : d.source === "ai"
+              ? "#153eab"
+              : "#39e0bc";
+        ctx.fillStyle = selected
+          ? "#ffcf6044"
+          : d.source === "ai"
+            ? "#153eab19"
+            : "#24d9aa19";
         ctx.fill();
         ctx.stroke();
-        if (this.layer === "Contours") return;
+        if (layer === "Contours") return;
         const screenScale =
-            c.width / Math.max(1, c.getBoundingClientRect().width),
+            c.width / Math.max(1, this.canvas.getBoundingClientRect().width),
           nearest = Math.min(
             ...this.detections
               .filter((e) => e.id !== d.id)
@@ -184,7 +190,7 @@ export class ImageViewer {
         ctx.fillText(String(i + 1), d.center.x, d.center.y + 0.5);
       });
     const roi = this.dragging || this.roi || this.analysis?.roi;
-    if (roi) {
+    if (roi && !finalOnly) {
       ctx.strokeStyle = "#ffcf60";
       ctx.lineWidth = Math.max(2, c.width / 400);
       ctx.setLineDash([c.width * 0.01, c.width * 0.006]);
