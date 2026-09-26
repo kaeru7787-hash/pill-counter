@@ -38,6 +38,12 @@ export function pixelReference(image: Raster, references: Detection[]) {
   const upper =
     [...distances].sort((a, b) => a - b)[Math.floor(distances.length * 0.9)] ||
     0;
+  const widths = references.map((d) => d.box.width).sort((a, b) => a - b);
+  const heights = references.map((d) => d.box.height).sort((a, b) => a - b);
+  const consistent = (sizes: number[]) =>
+    sizes[Math.floor(sizes.length * 0.9)] /
+      Math.max(1, sizes[Math.floor(sizes.length * 0.1)]) <
+    1.5;
   return {
     rgb,
     ready: references.length >= 8 && spread < 45 && upper < 90,
@@ -45,6 +51,9 @@ export function pixelReference(image: Raster, references: Detection[]) {
     area: median(references.map((d) => d.area)),
     edge: median(references.map((d) => boundaryEvidence(image, d))),
     round: median(references.map((d) => d.shape?.aspect || 1)) < 1.3,
+    width: median(widths),
+    height: median(heights),
+    uniformSize: consistent(widths) && consistent(heights),
   };
 }
 export function pixelRejection(
@@ -54,6 +63,27 @@ export function pixelRejection(
   neighbors: Detection[] = [],
 ) {
   if (!reference.ready) return [];
+  // A detector box includes padding and is not a foreground contour. For a
+  // uniform round family, inspect at the independently measured CV size when
+  // the AI box is substantially wider. Do not sample background as the pill's
+  // interior or search for its boundary outside the physical tablet.
+  if (
+    d.source === "ai" &&
+    reference.round &&
+    reference.uniformSize &&
+    d.box.width > reference.width * 1.3 &&
+    d.box.height > reference.height * 1.3
+  ) {
+    d = {
+      ...d,
+      box: {
+        x: d.center.x - reference.width / 2,
+        y: d.center.y - reference.height / 2,
+        width: reference.width,
+        height: reference.height,
+      },
+    };
+  }
   const { rgb, tolerance } = reference;
   let n = 0,
     matching = 0,
