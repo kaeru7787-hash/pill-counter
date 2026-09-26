@@ -100,6 +100,7 @@ export async function detectAI(
   roi: ROI,
   baseURL: string,
   cvCandidates: Detection[] = [],
+  modelKind: "pill" | "bottle" = "pill",
 ): Promise<{
   detections?: AICandidate[];
   tiles?: AICandidate[];
@@ -108,11 +109,13 @@ export async function detectAI(
 }> {
   try {
     let config = { ...defaults };
-    const cfg = await fetch(new URL("models/config.json", baseURL), {
+    const cfg = await fetch(new URL(modelKind === "bottle" ? "models/bottle-config.json" : "models/config.json", baseURL), {
       signal: AbortSignal.timeout(5000),
     });
     if (cfg.ok && cfg.headers.get("content-type")?.includes("json"))
       config = { ...config, ...(await cfg.json()) };
+    else if (modelKind === "bottle")
+      throw new Error("点眼専用AIの設定を読み込めません");
     if (
       config.format !== "yolov8-detect" ||
       ![320, 416, 512, 640, 960, 1280].includes(config.inputSize) ||
@@ -134,7 +137,7 @@ export async function detectAI(
     )
       throw new Error("モデル設定が不正または未対応です");
     const modelURL = new URL(
-      config.modelURL || "models/pill-counter.onnx",
+      config.modelURL || (modelKind === "bottle" ? "models/eyedrop-bottle.onnx" : "models/pill-counter.onnx"),
       baseURL,
     );
     if (
@@ -193,7 +196,7 @@ export async function detectAI(
       executionProviders: ["wasm"],
     });
     try {
-      return await inferViews(image, roi, config, session, ort, cvCandidates);
+      return await inferViews(image, roi, config, session, ort, cvCandidates, modelKind === "pill");
     } finally {
       await session.release();
     }
