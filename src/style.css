@@ -658,3 +658,24 @@ summary {
 
 .result-export { margin: 16px 0 24px; }
 .result-export p { margin: 8px 0; font-size: 12px; }
+.learning-panel { background: white; border: 1px solid var(--line, #d7e2e7); border-radius: 18px; padding: 22px; margin: 24px 0; }
+.learning-panel summary { cursor: pointer; font-weight: 700; }
+.learning-panel p, .learning-dialog p { line-height: 1.7; }
+.learning-controls, .learning-heading { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.learning-heading { justify-content: space-between; }
+.learning-heading h2 { margin: 0; }
+.learning-record { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 0; border-bottom: 1px solid #d7e2e7; }
+.learning-record span { width: 100%; overflow-wrap: anywhere; }
+.learning-record img { display: block; max-width: 100%; max-height: 500px; }
+.learning-dialog { width: min(720px, 94vw); max-height: 92dvh; padding: 20px; border: 1px solid #ced9df; border-radius: 16px; color: #173442; overflow-y: auto; box-sizing: border-box; }
+.learning-dialog::backdrop { background: #0b2333bb; }
+.learning-dialog > canvas { display: block; max-width: 100%; max-height: 48dvh; width: auto; height: auto; margin: auto; touch-action: none; cursor: crosshair; }
+.learning-dialog .field input { width: 100%; padding: 10px; box-sizing: border-box; }
+.learning-dialog .check { align-items: flex-start; margin: 18px 0; }
+.learning-dialog input[type=checkbox] { flex-shrink: 0; }
+.learning-deletion { display: grid; grid-template-columns: 64px 1fr; gap: 8px; align-items: center; padding: 8px 0; }
+.learning-deletion canvas { width: 64px; height: 64px; grid-row: span 2; }
+.learning-deletion select { max-width: 100%; padding: 8px; }
+.learning-suggestions { display: flex; flex-wrap: wrap; gap: 12px; }
+.learning-suggestions > div { border: 1px solid #ced9df; border-radius: 12px; padding: 10px; width: 180px; }
+.learning-suggestions canvas { max-width: 100%; }
