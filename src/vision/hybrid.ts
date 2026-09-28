@@ -13,9 +13,10 @@ export async function analyzeHybrid(
   if (settings.target === "bottle") {
     const started=performance.now();
     const result=await analyzeBottles(image,settings);
-    result.version="0.14.0";
+    result.version="0.15.0";
     if(!settings.useAI){result.aiStatus="点眼AI OFF（キャップの画像処理のみ）";return result;}
     const ai=await detectAI(image,result.roi,baseURL,[],"bottle");
+    result.model=ai.model;
     if(ai.detections&&ai.tiles){
       const cvCount=result.detections.length;
       const fused=fuseBottles(result.detections,[...ai.detections,...ai.tiles]);
@@ -34,7 +35,7 @@ export async function analyzeHybrid(
   }
   const start = performance.now();
   const result = await analyze(image, settings);
-  result.version = "0.14.0";
+  result.version = "0.15.0";
   if (!settings.useAI) {
     result.aiStatus = "AI併用OFF（画像処理のみ）";
     result.elapsed = performance.now() - start;
@@ -49,6 +50,7 @@ export async function analyzeHybrid(
   );
   const ai = await detectAI(image, roi, baseURL, result.detections);
   result.aiStatus = ai.status;
+  result.model = ai.model;
   if (ai.detections && ai.tiles) {
     const originalCount = result.detections.length;
     const f = fuse(result.detections, ai.detections, ai.tiles, image);
