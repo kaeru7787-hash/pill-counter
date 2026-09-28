@@ -242,61 +242,67 @@ test("real tray: 90 spatially supported detections, debug layers and batch corre
   });
 });
 
-test("colored tablets in bags and trays: positions and counts survive browser decoding", async ({
-  page,
-}) => {
-  test.setTimeout(300000);
-  for (const [file, count] of [
-    ["19-bag-round.jpg", 12],
-    ["20-bag-oblong.jpg", 36],
-    ["21-yellow-tray-round.png", 12],
-    ["22-yellow-tray-oblong.png", 36],
-  ] as const) {
-    await page.goto("./?debug=1");
-    await page.locator("#file").setInputFiles("tests/images/" + file);
-    await expect(page.locator("#status")).toContainText("解析完了", {
-      timeout: 90000,
-    });
-    await expect(page.locator("#count")).toHaveText(String(count));
-    await expect(page.locator("#list button")).toHaveCount(count);
-    await expect(page.locator("#confidence")).toContainText("要確認");
-    await page.locator("#save").click();
-    await expect(page.locator("#status")).toContainText("この端末に保存");
-    const downloadPromise = page.waitForEvent("download");
-    await page.locator("#export").click();
-    const stream = await (await downloadPromise).createReadStream();
-    let exported = "";
-    for await (const chunk of stream!) exported += chunk.toString();
-    const record = JSON.parse(exported).records.find(
-      (r: { filename: string }) => r.filename === file,
-    );
-    const annotation = JSON.parse(
-      await readFile(
-        "tests/annotations/" + file.replace(/\.[^.]+$/, ".json"),
-        "utf8",
-      ),
-    );
-    const centers = annotation.centers.map(([x, y]: number[]) => ({
-      x: (x * record.analysis.width) / annotation.width,
-      y: (y * record.analysis.height) / annotation.height,
-    }));
-    const scores = positionMetrics(
-      record.analysis.detections.map(
-        (d: { center: { x: number; y: number } }) => d.center,
-      ),
-      centers,
-      (annotation.tolerance * record.analysis.width) / annotation.width,
-    );
-    expect({ tp: scores.tp, fp: scores.fp, fn: scores.fn }).toEqual({
-      tp: count,
-      fp: 0,
-      fn: 0,
-    });
-    await page.screenshot({
-      path: `tests/reports/${file}-${test.info().project.name}.png`,
-      fullPage: true,
-    });
-  }
+test.describe("colored tablets with deterministic CV fallback", () => {
+  // A service worker can serve model configuration outside context.route after
+  // the first navigation. Keep the four CV fixtures on the same offline path.
+  // The dedicated PWA test above continues to exercise the service worker.
+  test.use({ serviceWorkers: "block" });
+  test("colored tablets in bags and trays: positions and counts survive browser decoding", async ({
+    page,
+  }) => {
+    test.setTimeout(300000);
+    for (const [file, count] of [
+      ["19-bag-round.jpg", 12],
+      ["20-bag-oblong.jpg", 36],
+      ["21-yellow-tray-round.png", 12],
+      ["22-yellow-tray-oblong.png", 36],
+    ] as const) {
+      await page.goto("./?debug=1");
+      await page.locator("#file").setInputFiles("tests/images/" + file);
+      await expect(page.locator("#status")).toContainText("解析完了", {
+        timeout: 90000,
+      });
+      await expect(page.locator("#count")).toHaveText(String(count));
+      await expect(page.locator("#list button")).toHaveCount(count);
+      await expect(page.locator("#confidence")).toContainText("要確認");
+      await page.locator("#save").click();
+      await expect(page.locator("#status")).toContainText("この端末に保存");
+      const downloadPromise = page.waitForEvent("download");
+      await page.locator("#export").click();
+      const stream = await (await downloadPromise).createReadStream();
+      let exported = "";
+      for await (const chunk of stream!) exported += chunk.toString();
+      const record = JSON.parse(exported).records.find(
+        (r: { filename: string }) => r.filename === file,
+      );
+      const annotation = JSON.parse(
+        await readFile(
+          "tests/annotations/" + file.replace(/\.[^.]+$/, ".json"),
+          "utf8",
+        ),
+      );
+      const centers = annotation.centers.map(([x, y]: number[]) => ({
+        x: (x * record.analysis.width) / annotation.width,
+        y: (y * record.analysis.height) / annotation.height,
+      }));
+      const scores = positionMetrics(
+        record.analysis.detections.map(
+          (d: { center: { x: number; y: number } }) => d.center,
+        ),
+        centers,
+        (annotation.tolerance * record.analysis.width) / annotation.width,
+      );
+      expect({ tp: scores.tp, fp: scores.fp, fn: scores.fn }).toEqual({
+        tp: count,
+        fp: 0,
+        fn: 0,
+      });
+      await page.screenshot({
+        path: `tests/reports/${file}-${test.info().project.name}.png`,
+        fullPage: true,
+      });
+    }
+  });
 });
 
 test("normal screen has only counting controls; developer panels are absent from view", async ({
