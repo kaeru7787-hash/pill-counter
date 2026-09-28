@@ -91,11 +91,8 @@ for (const c of cases.flatMap((c: any) =>
         analysis,
       }),
     );
-    await page.locator("#open-result-zoom").click();
-    await expect(page.getByRole("dialog")).toBeVisible();
-    await page.screenshot({ path: `${prefix}.png` });
-    await page.getByRole("button", { name: "拡大画像を閉じる" }).click();
-    await expect(page.getByRole("dialog")).not.toBeVisible();
+    await page.locator("#canvas-wrap").scrollIntoViewIfNeeded();
+    await page.locator("#canvas-wrap").screenshot({ path: `${prefix}.png` });
     // Operation/consistency checks; known accuracy deficits are reported, not hidden.
     await expect(page.locator("#count")).toHaveText(
       String(analysis.detections.length),

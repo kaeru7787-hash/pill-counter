@@ -1,94 +1,103 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+import sharp from "sharp";
 test.use({ serviceWorkers: "block" });
-test("numbered image zoom, pan, pinch and close preserve corrections", async ({
-  page,
-  context,
-}) => {
-  await context.route('**/models/config.json',r=>r.fulfill({status:404,body:''}));
-  await context.addInitScript(() =>
-    localStorage.setItem("pill-ai-enabled", "false"),
-  );
-  await page.goto("./");
-  await expect(page.locator("#open-result-zoom")).toBeDisabled();
-  await page
-    .locator("#file")
-    .setInputFiles("tests/images/01-white-separated.png");
+// Native touch pointers use this same handler. Synthetic ids cannot capture.
+async function gesture(page: Page, kind: "expand" | "shrink" | "pan" | "cancel") {
+  await page.locator("#canvas-wrap").scrollIntoViewIfNeeded();
+  await page.evaluate((kind) => {
+    const v = document.querySelector<HTMLElement>("#canvas-wrap")!;
+    const r = v.getBoundingClientRect(), cx = r.x+r.width/2, cy = r.y+r.height/2;
+    const capture = v.setPointerCapture; v.setPointerCapture = () => {};
+    const emit = (type: string, id: number, x: number) => v.dispatchEvent(new PointerEvent(type, {
+      pointerId: id, pointerType: "touch", clientX: cx+x, clientY: cy, bubbles: true,
+    }));
+    if (kind === "pan" || kind === "cancel") {
+      emit("pointerdown", 20, 0); emit("pointermove", 20, 45);
+      emit(kind === "cancel" ? "pointercancel" : "pointerup", 20, 45);
+    } else {
+      const from = kind === "expand" ? 30 : 60, to = kind === "expand" ? 60 : 30;
+      emit("pointerdown", 20, -from); emit("pointerdown", 21, from);
+      emit("pointermove", 20, -to); emit("pointermove", 21, to);
+      emit("pointerup", 20, -to); emit("pointerup", 21, to);
+    }
+    v.setPointerCapture = capture;
+  }, kind);
+}
+async function zoom(page: Page, value: number) {
+  await page.locator("#zoom").evaluate((el, value) => {
+    (el as HTMLInputElement).value=String(value); el.dispatchEvent(new Event("input", {bubbles:true}));
+  }, value);
+}
+test("integrated pinch only in select, editing coordinates, export and reset", async ({page,context}, info) => {
+  const errors: string[]=[]; page.on("pageerror", e=>errors.push(e.message));
+  await context.route("**/models/config.json", r=>r.fulfill({status:404,body:""}));
+  await page.goto("./?debug=1");
+  await expect(page.locator("#open-result-zoom, [data-mode=roi], [data-mode=batch], #reset-roi")).toHaveCount(0);
+  await page.locator("#file").setInputFiles("tests/images/01-white-separated.png");
   await expect(page.locator("#status")).toContainText("解析完了");
-  await page.locator('[data-mode="add"]').click();
-  const source = page.locator("#image-canvas");
-  const box = (await source.boundingBox())!;
-  await source.click({
-    position: { x: box.width * 0.88, y: box.height * 0.85 },
-  });
-  await expect(page.locator("#count")).toHaveText("25");
-  const open = page.locator("#open-result-zoom"),
-    dialog = page.getByRole("dialog");
-  await open.click();
-  await expect(dialog).toBeVisible();
-  await expect(dialog.locator("canvas")).toHaveAttribute("width", "640");
-  await expect(dialog.locator("output")).toHaveText("100%");
-  await dialog.getByRole("button", { name: "拡大", exact: true }).click();
-  await expect(dialog.locator("output")).toHaveText("150%");
-  // Exercise the same two-pointer stream dispatched by mobile browsers.
-  // Synthetic pointer ids cannot acquire native capture; suppress only capture.
-  const pinch = async (expand: boolean) =>
-    page.evaluate((expand) => {
-      const v = document.querySelector<HTMLElement>(".result-zoom-viewport")!;
-      const rect = v.getBoundingClientRect(),
-        cx = rect.x + rect.width / 2,
-        cy = rect.y + rect.height / 2;
-      const capture = v.setPointerCapture;
-      v.setPointerCapture = () => {};
-      const emit = (type: string, id: number, x: number) =>
-        v.dispatchEvent(
-          new PointerEvent(type, {
-            pointerId: id,
-            pointerType: "touch",
-            clientX: cx + x,
-            clientY: cy,
-            bubbles: true,
-          }),
-        );
-      const from = expand ? 40 : 80,
-        to = expand ? 80 : 40;
-      emit("pointerdown", 20, -from);
-      emit("pointerdown", 21, from);
-      emit("pointermove", 20, -to);
-      emit("pointermove", 21, to);
-      emit("pointerup", 20, -to);
-      emit("pointerup", 21, to);
-      v.setPointerCapture = capture;
-    }, expand);
-  await pinch(true);
-  await expect(dialog.locator("output")).toHaveText("300%");
-  await pinch(false);
-  await expect(dialog.locator("output")).toHaveText("150%");
-  await expect(page.locator("#count")).toHaveText("25");
-  const viewport = await dialog.locator(".result-zoom-viewport").boundingBox();
-  await page.mouse.move(
-    viewport!.x + viewport!.width / 2,
-    viewport!.y + viewport!.height / 2,
-  );
-  await page.mouse.down();
-  await page.mouse.move(
-    viewport!.x + viewport!.width / 2 + 50,
-    viewport!.y + viewport!.height / 2 + 50,
-  );
-  await page.mouse.up();
-  await dialog.getByRole("button", { name: "拡大画像を閉じる" }).click();
-  await expect(dialog).not.toBeVisible();
-  await expect(open).toBeFocused();
-  // Native dialog close queues the cleanup event after visibility/focus change.
-  await expect
-    .poll(() => page.evaluate(() => document.body.style.overflow))
-    .toBe("");
-  await page.locator("#undo").click();
   await expect(page.locator("#count")).toHaveText("24");
-  await open.click();
-  await expect(dialog.locator("output")).toHaveText("100%");
-  await page.keyboard.press("Escape");
-  await expect(dialog).not.toBeVisible();
-  await expect
-    .poll(() => page.evaluate(() => document.body.style.overflow))
-    .toBe("");
+  await gesture(page,"expand"); await expect(page.locator("#zoom-value")).toHaveText("200%");
+  await gesture(page,"shrink"); await expect(page.locator("#zoom-value")).toHaveText("100%");
+  await zoom(page,3);
+  await gesture(page,"pan");
+  const transform = await page.locator("#image-canvas").evaluate(el=>el.style.transform);
+  expect(transform).toContain("45px");
+  for (const mode of ["add","delete"]) {
+    await page.locator(`[data-mode=${mode}]`).click();
+    await gesture(page,"expand"); await gesture(page,"pan"); await gesture(page,"cancel");
+    await expect(page.locator("#zoom-value")).toHaveText("300%");
+    await expect(page.locator("#count")).toHaveText("24");
+    expect(await page.locator("#image-canvas").evaluate(el=>el.style.transform)).toBe(transform);
+  }
+  await page.locator('[data-mode=add]').click();
+  await page.locator("#canvas-wrap").scrollIntoViewIfNeeded();
+  const expected = await page.locator("#canvas-wrap").evaluate(v=> {
+    const r=v.getBoundingClientRect(), c=v.querySelector("canvas")!, cr=c.getBoundingClientRect();
+    return {x:r.x+r.width/2,y:r.y+r.height/2, imageX:(r.x+r.width/2-cr.x)*c.width/cr.width,imageY:(r.y+r.height/2-cr.y)*c.height/cr.height};
+  });
+  await page.mouse.click(expected.x,expected.y);
+  await expect(page.locator("#count")).toHaveText("25");
+  await page.locator("#save").click();
+  await expect(page.locator("#status")).toContainText("この端末に保存");
+  const downloadPromise=page.waitForEvent("download"); await page.locator("#export").click();
+  const stream=await (await downloadPromise).createReadStream(); let data="";
+  for await(const part of stream!) data+=part.toString();
+  const record=JSON.parse(data).records[0];
+  const manual=record.corrected.find((d:any)=>d.source==="manual");
+  expect(manual.center.x).toBeCloseTo(expected.imageX,0);
+  expect(manual.center.y).toBeCloseTo(expected.imageY,0);
+  // Force download on both engines rather than native sharing / picker.
+  await page.evaluate(()=>{
+    Object.defineProperty(navigator,"canShare",{value:()=>false,configurable:true});
+    Object.defineProperty(window,"showSaveFilePicker",{value:undefined,configurable:true});
+  });
+  const pngPromise=page.waitForEvent("download"); await page.locator("#save-result-image").click();
+  const png=await pngPromise; const pngStream=await png.createReadStream();const chunks: Buffer[]=[];
+  for await(const part of pngStream!) chunks.push(Buffer.from(part));
+  const meta=await sharp(Buffer.concat(chunks)).metadata();
+  expect([meta.width,meta.height]).toEqual([640,480]); expect(png.suggestedFilename()).toContain("_25.png");
+  await page.locator("#undo").click(); await expect(page.locator("#count")).toHaveText("24");
+  await page.locator("#redo").click(); await expect(page.locator("#count")).toHaveText("25");
+  expect(await page.locator("#image-canvas").evaluate(el=>el.style.transform)).toBe(transform);
+  await page.locator('[data-mode=select]').click();
+  await page.locator("#canvas-wrap").scrollIntoViewIfNeeded();
+  let box=(await page.locator("#canvas-wrap").boundingBox())!;
+  await page.mouse.click(box.x+box.width/2,box.y+box.height/2);
+  await expect(page.locator("#delete-selected")).toBeEnabled();
+  await page.locator('[data-mode=delete]').click();
+  await page.locator("#canvas-wrap").scrollIntoViewIfNeeded();
+  box=(await page.locator("#canvas-wrap").boundingBox())!;
+  await page.mouse.click(box.x+box.width/2,box.y+box.height/2);
+  await expect(page.locator("#count")).toHaveText("24");
+  await page.locator("#undo").click(); await expect(page.locator("#count")).toHaveText("25");
+  await page.locator("#fit-image").click(); await expect(page.locator("#zoom-value")).toHaveText("100%");
+  await zoom(page,2);
+  page.on("dialog",d=>d.accept());
+  await page.locator("#file").setInputFiles("tests/images/01-white-separated.png");
+  await expect(page.locator("#status")).toContainText("解析完了");
+  await expect(page.locator("#zoom-value")).toHaveText("100%"); await expect(page.locator("#count")).toHaveText("24");
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+  await page.locator("#canvas-wrap").scrollIntoViewIfNeeded();
+  await page.screenshot({path:`tests/reports/integrated-zoom-${info.project.name}.png`,fullPage:true});
+  expect(errors).toEqual([]);
 });
