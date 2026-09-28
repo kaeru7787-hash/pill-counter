@@ -1,9 +1,11 @@
+import { additionGuard, hardRejected } from "./ai/additionGuard";
+import { duplicateOf } from "./ai/objectIdentity";
 import { features, near, type Target } from "./learning";
 import type { Analysis, Detection, Raster, ROI } from "./types";
 
 // Supervised, bounded radial-basis classifier. Its learned centres are appearance
 // statistics, not image crops, coordinates, filenames or a replay dataset.
-export type Kind = "keep" | "add" | "remove";
+export type Kind = "keep" | "add" | "remove" | "duplicate";
 export type Unit = {
   mean: number[];
   mass: number;
@@ -33,10 +35,10 @@ export function validModel(m: unknown): m is LocalModel {
     ["pill", "bottle"].includes(v.target) &&
     Number.isFinite(v.updates) &&
     Array.isArray(v.units) &&
-    v.units.length <= 96 &&
+    v.units.length <= 128 &&
     v.units.every(
       (u) =>
-        ["keep", "add", "remove"].includes(u.kind) &&
+        ["keep", "add", "remove", "duplicate"].includes(u.kind) &&
         u.mean?.length === 18 &&
         u.mean.every((x) => Number.isFinite(x) && x >= 0 && x <= 1) &&
         Number.isFinite(u.mass) &&
@@ -64,7 +66,7 @@ function updateUnit(units: Unit[], sample: Unit) {
     match.mass = Math.min(20, match.mass + sample.mass);
   } else units.push(structuredClone(sample));
   // Equal quotas prevent hundreds of accepted tablets from erasing corrections.
-  for (const kind of ["keep", "add", "remove"] as Kind[]) {
+  for (const kind of ["keep", "add", "remove", "duplicate"] as Kind[]) {
     const same = units.filter((u) => u.kind === kind);
     if (same.length > 32) {
       const weakest = same.reduce((a, b) => (a.mass <= b.mass ? a : b));
@@ -112,9 +114,15 @@ export function learnCorrections(
             }
           : d.box,
     }));
+  const duplicate = automatic.filter(
+    (d) =>
+      !currentIDs.has(d.id) &&
+      (duplicateOf(d, corrected) || corrected.some((c) => near(c, d))),
+  );
   const removed = automatic.filter(
     (d) =>
       !currentIDs.has(d.id) &&
+      !duplicate.includes(d) &&
       !corrected.some(
         (c) =>
           near(c, d) ||
@@ -131,6 +139,7 @@ export function learnCorrections(
     ["keep", retained],
     ["add", added],
     ["remove", removed],
+    ["duplicate", duplicate],
   ] as [Kind, Detection[]][]) {
     // A dense image contributes at most 96 observations of each type.
     const step = Math.max(1, Math.ceil(items.length / 96));
@@ -190,9 +199,27 @@ export function applyLearning(
   model?: LocalModel,
 ): Analysis {
   if (!model || !validModel(model) || !model.units.length) return result;
-  const kept = result.detections.filter(
-    (d) => !decision(model, features(image, d.box)).remove,
-  );
+  const guard =
+    model.target === "pill"
+      ? additionGuard(image, result.detections)
+      : undefined;
+  // A deleted duplicate describes an occupied object, not background. Learn
+  // its appearance separately; never remove an isolated matching tablet.
+  const learnedDuplicate = (d: Detection, accepted: Detection[]) =>
+    d.source === "ai" &&
+    nearest(model, features(image, d.box), ["duplicate"]) < 0.027 &&
+    accepted.some((k) => near(d, k));
+  const kept: Detection[] = [];
+  for (const d of [...result.detections].sort(
+    (a, b) => Number(a.source === "ai") - Number(b.source === "ai"),
+  )) {
+    if (
+      decision(model, features(image, d.box)).remove ||
+      learnedDuplicate(d, kept)
+    )
+      continue;
+    kept.push(d);
+  }
   const removed = result.detections.length - kept.length;
   const proposals: { d: Detection; q: number }[] = [];
   const occupied = (d: Detection) =>
@@ -204,8 +231,14 @@ export function applyLearning(
           k.center.y >= d.box.y &&
           k.center.y <= d.box.y + d.box.height),
     );
+  const forbidden = (result.rejectedCandidates || []).filter(hardRejected);
+  const blocked = (d: Detection) =>
+    hardRejected(d) ||
+    forbidden.some((r) => !!duplicateOf(d, [r]) || near(d, r)) ||
+    (guard?.({ ...d, source: "ai" }, kept).length ?? 0) > 0 ||
+    learnedDuplicate(d, kept);
   const consider = (d: Detection) => {
-    if (!inside(d.box, result.roi) || occupied(d)) return;
+    if (!inside(d.box, result.roi) || occupied(d) || blocked(d)) return;
     const s = decision(model, features(image, d.box));
     if (s.add) proposals.push({ d, q: s.quality });
   };
@@ -222,7 +255,7 @@ export function applyLearning(
   const ratios = result.detections.flatMap((d) => {
     const x = features(image, d.box);
     const unit = model.units
-      .filter((u) => u.kind !== "remove")
+      .filter((u) => u.kind === "keep" || u.kind === "add")
       .sort(
         (a, b) => appearanceDistance(x, a.mean) - appearanceDistance(x, b.mean),
       )[0];
@@ -305,7 +338,7 @@ export function applyLearning(
       }
   }
   for (const { d } of proposals.sort((a, b) => a.q - b.q))
-    if (!occupied(d))
+    if (!occupied(d) && !blocked(d))
       kept.push({
         ...d,
         id: `learned-${kept.length + 1}`,

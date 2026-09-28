@@ -129,3 +129,94 @@ test("AI box shifted inside an already matched complete optical contour is not c
     ),
   );
 });
+
+test("shifted long-tablet views and imperfect optical contour count once", () => {
+  const c: Detection = {
+    ...pill(100),
+    center: { x: 100, y: 50 },
+    box: { x: 70, y: 40, width: 60, height: 20 },
+    area: 900,
+    contour: [
+      { x: 70, y: 40 },
+      { x: 130, y: 40 },
+      { x: 130, y: 60 },
+      { x: 70, y: 60 },
+    ],
+    shape: { solidity: 0.85, circularity: 0.55, aspect: 3, perimeter: 140 },
+  };
+  const shifted = { ...c, center: { x: 112, y: 50 }, box: { ...c.box, x: 82 } };
+  assert.equal(
+    fuse([c], [ai(shifted, "full")], [ai(shifted, "tile")]).detections.length,
+    1,
+  );
+  const shiftedAgain = {
+    ...c,
+    center: { x: 118, y: 50 },
+    box: { ...c.box, x: 88 },
+  };
+  const candidates = [c, shiftedAgain];
+  assert.equal(
+    fuse(
+      [],
+      candidates.map((d) => ai(d, "full")),
+      candidates.map((d) => ai(d, "tile")),
+    ).detections.length,
+    1,
+  );
+});
+
+test("neighboring long tablets survive while merged optical regions yield to AI instances", () => {
+  const refs = Array.from(
+    { length: 8 },
+    (_, i): Detection => ({
+      ...pill(60 + i * 75),
+      box: { x: 30 + i * 75, y: 70, width: 60, height: 20 },
+      area: 1000,
+      shape: { solidity: 0.98, circularity: 0.6, aspect: 3, perimeter: 140 },
+    }),
+  );
+  const neighbors = [
+    ...refs,
+    {
+      ...refs[0],
+      id: "lower",
+      center: { x: 60, y: 105 },
+      box: { x: 30, y: 95, width: 60, height: 20 },
+    },
+  ];
+  const merged: Detection = {
+    ...refs[0],
+    id: "merged",
+    center: { x: 60, y: 92 },
+    box: { x: 30, y: 70, width: 60, height: 45 },
+    area: 1900,
+    contour: [
+      { x: 30, y: 70 },
+      { x: 90, y: 70 },
+      { x: 90, y: 115 },
+      { x: 30, y: 115 },
+    ],
+    shape: { solidity: 0.9, circularity: 0.65, aspect: 1.3, perimeter: 220 },
+  };
+  const result = fuse(
+    [
+      ...refs.slice(1),
+      {
+        ...refs[7],
+        id: "far",
+        center: { x: 800, y: 80 },
+        box: { x: 770, y: 70, width: 60, height: 20 },
+      },
+      merged,
+    ],
+    neighbors.map((d) => ai(d, "full")),
+    neighbors.map((d) => ai(d, "tile")),
+  );
+  assert.ok(result.rejected.some((d) => d.id === "merged"));
+  assert.ok(
+    result.detections.some((d) => d.center.x === 60 && d.center.y === 80),
+  );
+  assert.ok(
+    result.detections.some((d) => d.center.x === 60 && d.center.y === 105),
+  );
+});

@@ -59,3 +59,45 @@ test("AI circle follows nearby optical size, ignores fragments and falls back wi
   assert.equal(aiMarkerRadius(ai, []), 30);
   assert.equal(aiMarkerRadius(ai, [detection(1200, 40)]), 30);
 });
+
+import { additionGuard } from "../src/ai/additionGuard";
+test("AI and learned additions cannot borrow foreground from blue apertures or a gray gap", () => {
+  const image = {
+    width: 400,
+    height: 300,
+    data: new Uint8ClampedArray(400 * 300 * 4),
+  };
+  for (let i = 0; i < image.data.length; i += 4)
+    image.data.set([110, 110, 110, 255], i);
+  const refs: Detection[] = Array.from({ length: 8 }, (_, i) => {
+    const x = 40 + (i % 4) * 90,
+      y = 40 + Math.floor(i / 4) * 80;
+    for (let py = y - 14; py <= y + 14; py++)
+      for (let px = x - 28; px <= x + 28; px++)
+        image.data.set([230, 230, 230, 255], (py * 400 + px) * 4);
+    return {
+      id: String(i),
+      center: { x, y },
+      box: { x: x - 30, y: y - 15, width: 60, height: 30 },
+      area: 1400,
+      source: "cv",
+      flags: [],
+      contour: [],
+      shape: { solidity: 0.98, circularity: 0.6, aspect: 2, perimeter: 160 },
+    };
+  });
+  for (let y = 200; y < 240; y++)
+    for (let x = 20; x < 80; x++)
+      image.data.set([100, 155, 210, 255], (y * 400 + x) * 4);
+  const at = (x: number, y: number): Detection => ({
+    ...refs[0],
+    source: "ai",
+    center: { x, y },
+    box: { x: x - 30, y: y - 15, width: 60, height: 30 },
+    shape: undefined,
+  });
+  const guard = additionGuard(image, refs);
+  assert.ok(guard(at(50, 220), refs).length);
+  assert.ok(guard(at(180, 220), refs).length);
+  assert.equal(guard({ ...refs[0], source: "ai" }, refs.slice(1)).length, 0);
+});
