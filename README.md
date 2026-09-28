@@ -1,5 +1,7 @@
 # 錠数ノート — ブラウザ内錠剤カウンター
 
+**v0.14.0：影で暗くなった錠剤を局所的な色と輪郭で確認し、密集部は回転した向きでもAI照合。分割片の置換時にも重複・背景を審査します。[変更内容・検証と制約](V014.md)。**
+
 **v0.13.0：長円錠の二重カウント、背景へのAI追加、除外候補が補正学習で復活する経路を修正。重複の削除は背景とは分けて学習します。[変更内容・検証と制約](V013.md)。**
 
 **v0.12.0：光学的に丸形・長円形とサイズを推定し、密集画像を適切な倍率でAI再検出。印字による輪郭の欠損・トレー穴・重複追加を抑え、補正学習は撮影サイズと明るさの変化に対応しました。学習の実反映数を表示し、目視確認チェックを削除。AIマークは近くの光学検出サイズに合わせた濃い青の丸です。[検証結果と制約](V012.md)。**
@@ -249,5 +251,3 @@ tests/reports/            # 精度・改善記録
 ```
 
 主な参考仕様：[OpenCV Watershed](https://docs.opencv.org/4.12.0/d7/d1c/tutorial_js_watershed.html)、[ONNX Runtime Web配布](https://onnxruntime.ai/docs/tutorials/web/deploy.html)、[GitHub Pagesワークフロー](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)。
-
-

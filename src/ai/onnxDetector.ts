@@ -95,6 +95,23 @@ export function decodeYolo(
   return kept.map((c) => c.d);
 }
 export type AICandidate = Detection & { score: number; view: string };
+/** Map a clockwise-rotated crop back into the original photo, including ROI offset. */
+export function unrotateDetection(d: Detection, roi: ROI): Detection {
+  return {
+    ...d,
+    center: { x: roi.x + d.center.y, y: roi.y + roi.height - d.center.x },
+    box: {
+      x: roi.x + d.box.y,
+      y: roi.y + roi.height - d.box.x - d.box.width,
+      width: d.box.height,
+      height: d.box.width,
+    },
+    contour: d.contour.map((p) => ({
+      x: roi.x + p.y,
+      y: roi.y + roi.height - p.x,
+    })),
+  };
+}
 export async function detectAI(
   image: Raster,
   roi: ROI,
@@ -241,18 +258,23 @@ export async function inferViews(
     roi: ROI,
     view: string,
     normalize = false,
+    rotate = false,
   ): Promise<AICandidate[]> => {
     const { cv } = await getCV(),
       src = cv.matFromImageData(image as ImageData),
       part = src.roi(new cv.Rect(roi.x, roi.y, roi.width, roi.height)),
       resized = new cv.Mat();
+    const rotated = rotate ? new cv.Mat() : undefined;
+    if (rotated) cv.rotate(part, rotated, cv.ROTATE_90_CLOCKWISE);
+    const inputWidth = rotate ? roi.height : roi.width;
+    const inputHeight = rotate ? roi.width : roi.height;
     const size = config.inputSize,
-      scale = Math.min(size / roi.width, size / roi.height),
-      w = Math.round(roi.width * scale),
-      h = Math.round(roi.height * scale),
+      scale = Math.min(size / inputWidth, size / inputHeight),
+      w = Math.round(inputWidth * scale),
+      h = Math.round(inputHeight * scale),
       px = Math.floor((size - w) / 2),
       py = Math.floor((size - h) / 2);
-    cv.resize(part, resized, new cv.Size(w, h));
+    cv.resize(rotated || part, resized, new cv.Size(w, h));
     const tensor = new Float32Array(3 * size * size).fill(114 / 255);
     const resizedPixels = resized.data;
     let low = 0,
@@ -287,6 +309,7 @@ export async function inferViews(
     src.delete();
     part.delete();
     resized.delete();
+    rotated?.delete();
     const input = new ort.Tensor("float32", tensor, [1, 3, size, size]);
     try {
       const output = await session.run({ [session.inputNames[0]]: input });
@@ -299,8 +322,12 @@ export async function inferViews(
           scale,
           px,
           py,
-          roi,
-        ).map((d) => ({ ...d, score: d.score || 0, view }));
+          rotate ? { x: 0, y: 0, width: inputWidth, height: inputHeight } : roi,
+        ).map((d) => ({
+          ...(rotate ? unrotateDetection(d, roi) : d),
+          score: d.score || 0,
+          view,
+        }));
       } finally {
         Object.values(output).forEach((t) => t.dispose());
       }
@@ -371,7 +398,8 @@ export async function inferViews(
           height,
         };
         // Skip empty areas using optical foreground candidates, not a crop that
-        // would discard isolated pills. Each occupied tile gets two exposures.
+        // would discard isolated pills. Two exposures plus an orthogonal view
+        // recover side-on/touching objects without lowering the score threshold.
         if (
           !cvCandidates.some(
             (d) =>
@@ -382,11 +410,12 @@ export async function inferViews(
           )
         )
           continue;
-        for (const normalize of [false, true]) {
+        for (const mode of ["original", "contrast", "rotated"]) {
           const ds = await infer(
             r,
-            `shape-${ix}-${iy}-${normalize}`,
-            normalize,
+            `shape-${ix}-${iy}-${mode}`,
+            mode === "contrast",
+            mode === "rotated",
           );
           tiles.push(
             ...ds.filter(
@@ -431,6 +460,6 @@ export async function inferViews(
     regions,
     detections,
     tiles,
-    status: `ONNXモデルで照合済み（全体＋4区画） / 局所再解析 ${regions.length}領域 / 形状に合わせた拡大 ${shapeViews}区画`,
+    status: `ONNXモデルで照合済み（全体＋4区画） / 局所再解析 ${regions.length}領域 / 形状に合わせた拡大・回転照合 ${shapeViews}区画`,
   };
 }

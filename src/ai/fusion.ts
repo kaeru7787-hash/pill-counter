@@ -7,7 +7,11 @@ import {
 } from "./candidateReview";
 import type { AICandidate } from "./onnxDetector";
 import { iou } from "./onnxDetector";
-import { pixelReference, pixelRejection } from "./pixelEvidence";
+import {
+  contextualPixelReference,
+  pixelReference,
+  pixelRejection,
+} from "./pixelEvidence";
 import { overlappingObject, contains } from "./objectIdentity";
 import { additionGuard } from "./additionGuard";
 export { contains } from "./objectIdentity";
@@ -45,10 +49,20 @@ export function fuse(
       c.area < profile.area * 1.5 &&
       stable.some((a) => associated(c, a)),
   );
-  const pixels = image ? pixelReference(image, references) : undefined;
+  const pixels = image
+    ? contextualPixelReference(image, references)
+    : undefined;
+  const opticalPixels = image ? pixelReference(image, references) : undefined;
   const veto = (d: Detection, neighbors: Detection[] = []) => {
     const reasons =
-      image && pixels ? pixelRejection(image, d, pixels, neighbors) : [];
+      image && pixels && opticalPixels
+        ? pixelRejection(
+            image,
+            d,
+            d.source === "ai" ? pixels(d) : opticalPixels,
+            neighbors,
+          )
+        : [];
     if (reasons.length)
       rejected.push({ ...d, flags: [...d.flags, ...reasons] });
     return reasons.length > 0;
@@ -135,6 +149,16 @@ export function fuse(
           group.every((c) => c.area < profile.area * 0.55) &&
           group.reduce((s, c) => s + c.area, 0) < a.area * 0.9))
     ) {
+      // A replacement is an addition too. Exclude only the fragments being
+      // replaced; other accepted objects must still veto duplicates/background.
+      const reasons = guard(
+        a,
+        detections.filter((d) => !group.includes(d)),
+      );
+      if (reasons.length) {
+        rejected.push({ ...a, flags: [...a.flags, ...reasons] });
+        continue;
+      }
       const sorted = [...group].sort((b, c) => c.area - b.area);
       removed.push(...sorted.slice(1));
       replaced.push(sorted[0]);

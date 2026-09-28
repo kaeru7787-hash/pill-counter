@@ -56,6 +56,58 @@ export function pixelReference(image: Raster, references: Detection[]) {
     uniformSize: consistent(widths) && consistent(heights),
   };
 }
+
+/** Illumination varies across a tray. Only measured optical objects calibrate
+ * local colour; newly added AI objects never bootstrap one another's acceptance.
+ * A dark candidate must also have its own boundary before using this correction. */
+export function contextualPixelReference(
+  image: Raster,
+  references: Detection[],
+) {
+  const global = pixelReference(image, references);
+  const samples = references.map((d) => ({ d, rgb: appearance(image, d).rgb }));
+  return (candidate: Detection) => {
+    if (!global.ready) return global;
+    const radius =
+      8 *
+      Math.min(
+        Math.max(candidate.box.width, candidate.box.height),
+        Math.max(global.width, global.height),
+      );
+    const near = samples
+      .map((s) => ({
+        ...s,
+        distance: Math.hypot(
+          s.d.center.x - candidate.center.x,
+          s.d.center.y - candidate.center.y,
+        ),
+      }))
+      .filter((s) => s.d !== candidate && s.distance < radius)
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 8);
+    if (near.length < 6) return global;
+    const rgb = [0, 1, 2].map((i) => median(near.map((s) => s.rgb[i])));
+    const light = (c: number[]) => c.reduce((a, b) => a + b, 0) / 3;
+    const ratio = light(rgb) / Math.max(1, light(global.rgb));
+    if (ratio >= 0.98 || ratio < 0.75) return global;
+    // A detector rectangle can include padding, especially on a side-on pill.
+    // Search inside it as well; the measured core must still pass colour checks.
+    const edge = Math.max(
+      ...[1, 0.75, 0.55].map((scale) =>
+        boundaryEvidence(image, {
+          ...candidate,
+          box: {
+            ...candidate.box,
+            width: candidate.box.width * scale,
+            height: candidate.box.height * scale,
+          },
+        }),
+      ),
+    );
+    if (edge < Math.max(12, global.edge * 0.2)) return global;
+    return { ...global, rgb };
+  };
+}
 export function pixelRejection(
   image: Raster,
   d: Detection,

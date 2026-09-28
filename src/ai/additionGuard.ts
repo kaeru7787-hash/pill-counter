@@ -1,6 +1,6 @@
 import type { Detection, Raster } from "../types";
 import { duplicateOf } from "./objectIdentity";
-import { pixelReference, pixelRejection } from "./pixelEvidence";
+import { contextualPixelReference, pixelRejection } from "./pixelEvidence";
 
 export const DUPLICATE = "検出済み輪郭の内部にある重複候補";
 export const HARD_REJECTION = "追加抑制:背景または重複";
@@ -27,10 +27,13 @@ export function additionGuard(
       d.shape.solidity > 0.88 &&
       d.shape.circularity > 0.45,
   );
-  const reference = image ? pixelReference(image, clean) : undefined;
+  const referenceFor = image
+    ? contextualPixelReference(image, clean)
+    : undefined;
   return (d: Detection, accepted: Detection[]): string[] => {
     if (duplicateOf(d, accepted)) return [HARD_REJECTION, DUPLICATE];
-    if (!image || !reference) return [];
+    if (!image || !referenceFor) return [];
+    const reference = referenceFor(d);
     const reasons = pixelRejection(image, d, reference, accepted);
     if (reasons.length) return [HARD_REJECTION, ...reasons];
     if (!reference.ready) return [];
