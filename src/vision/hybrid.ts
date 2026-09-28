@@ -13,7 +13,7 @@ export async function analyzeHybrid(
   if (settings.target === "bottle") {
     const started=performance.now();
     const result=await analyzeBottles(image,settings);
-    result.version="0.12.0";
+    result.version="0.13.0";
     if(!settings.useAI){result.aiStatus="点眼AI OFF（キャップの画像処理のみ）";return result;}
     const ai=await detectAI(image,result.roi,baseURL,[],"bottle");
     if(ai.detections&&ai.tiles){
@@ -34,7 +34,7 @@ export async function analyzeHybrid(
   }
   const start = performance.now();
   const result = await analyze(image, settings);
-  result.version = "0.12.0";
+  result.version = "0.13.0";
   if (!settings.useAI) {
     result.aiStatus = "AI併用OFF（画像処理のみ）";
     result.elapsed = performance.now() - start;
@@ -65,7 +65,7 @@ export async function analyzeHybrid(
       .map((d, i) => ({ ...d, id: `hybrid-${i + 1}` }));
     result.rejectedCandidates = f.rejected;
     result.algorithm = `AI＋形状照合＋候補審査 / ${result.algorithm || "画像処理"}`;
-    result.aiStatus = `AI併用：画像処理 ${originalCount} → 併用 ${result.detections.length}（追加 ${f.added.length}・重複統合 ${f.removed.length}・背景除外 ${f.rejected.length}） / ${ai.status}`;
+    result.aiStatus = `AI併用：画像処理 ${originalCount} → 併用 ${result.detections.length}（追加 ${f.added.length}・重複統合 ${f.removed.length}・候補整理 ${f.rejected.length}） / ${ai.status}`;
     // Trial scores are not calibrated probabilities. Agreement does not prove
     // completeness: the known glare case still misses one pill.
     result.confidence = {
@@ -77,7 +77,7 @@ export async function analyzeHybrid(
     };
     result.diagnostics.push(
       `AI全体 ${ai.detections.length} / 複数範囲で支持 ${f.stable.length}`,
-      `背景除外 ${f.rejected.length} / 画像内形状照合 ${f.profile.uniform ? "有効" : "サイズ混在・候補不足のため保留"}`,
+      `背景・重複・接触輪郭の整理 ${f.rejected.length} / 画像内形状照合 ${f.profile.uniform ? "有効" : "サイズ混在・候補不足のため保留"}`,
     );
   } else if (ai.failed) {
     result.confidence = {
