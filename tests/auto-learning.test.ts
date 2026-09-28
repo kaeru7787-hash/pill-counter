@@ -145,9 +145,9 @@ test("training is durable before exit, activated on finish/recovery, and undo re
   store.stage("photo", initial);
   store.finish("pill");
   assert.ok(store.model("pill").units.every((u) => u.kind !== "remove"));
-  assert.equal(store.model("pill").updates, 1);
+  assert.equal(store.model("pill").updates, 0);
   store.finish("pill");
-  assert.equal(store.model("pill").updates, 1);
+  assert.equal(store.model("pill").updates, 0);
   assert.equal(store.model("bottle").updates, 0);
   assert.equal(values.size, 1);
   assert.ok(values.has(MODEL_KEY + "pill"));
@@ -190,4 +190,87 @@ test("storage failure does not claim completion or erase the last durable model"
     },
   });
   assert.throws(() => store.stage("x", emptyModel("pill")), /quota/);
+});
+
+// Different exposure and object scale exercise generalization, not saved coordinates.
+test("exposure changes preserve a learned removal without erasing accepted objects", () => {
+  const a = d("a", 35, 35),
+    bad = d("bad", 120, 25);
+  const model = learnCorrections(
+    scene(),
+    [a, bad],
+    [a],
+    analysis([]).roi,
+    "pill",
+  );
+  const next = scene(5);
+  for (let i = 0; i < next.data.length; i++)
+    if (i % 4 !== 3) next.data[i] += 20;
+  const out = applyLearning(
+    next,
+    analysis([d("a", 40, 35), d("bad", 125, 25)]),
+    model,
+  );
+  assert.equal(out.learning?.removed, 1);
+  assert.equal(out.detections.length, 1);
+});
+test("untouched results are not counted as supervised corrections", () => {
+  const a = d("a", 35, 35);
+  const model = learnCorrections(scene(), [a], [a], analysis([]).roi, "pill");
+  assert.equal(model.updates, 0);
+  assert.equal(model.units.length, 0);
+});
+test("learned additions follow current object scale, without saved proposals", () => {
+  const make = (scale: number) => {
+    const im: Raster = {
+      width: 220,
+      height: 150,
+      data: new Uint8ClampedArray(220 * 150 * 4),
+    };
+    for (let i = 0; i < im.data.length; i += 4)
+      im.data.set([25, 30, 35, 255], i);
+    const ds = [
+      [40, 40],
+      [110, 40],
+      [180, 40],
+      [110, 110],
+    ].map(([x, y], i) => {
+      for (let py = 0; py < 150; py++)
+        for (let px = 0; px < 220; px++)
+          if (Math.hypot(px - x, py - y) < 9 * scale)
+            im.data.set([220, 220, 220, 255], (py * 220 + px) * 4);
+      return {
+        ...d(String(i), x, y),
+        box: {
+          x: x - 10 * scale,
+          y: y - 10 * scale,
+          width: 20 * scale,
+          height: 20 * scale,
+        },
+      };
+    });
+    return { im, ds };
+  };
+  const first = make(1),
+    next = make(1.4),
+    roi = { x: 0, y: 0, width: 220, height: 150 };
+  const model = learnCorrections(
+    first.im,
+    first.ds.slice(0, 3),
+    first.ds.map((d, i) => (i === 3 ? { ...d, source: "manual" } : d)),
+    roi,
+    "pill",
+  );
+  const out = applyLearning(
+    next.im,
+    { ...analysis(next.ds.slice(0, 3)), width: 220, height: 150, roi },
+    model,
+  );
+  assert.equal(out.detections.length, 4);
+  assert.equal(out.learning?.added, 1);
+  assert.ok(
+    out.detections.some(
+      (d) => Math.hypot(d.center.x - 110, d.center.y - 110) < 5,
+    ),
+  );
 });
