@@ -274,3 +274,40 @@ test("learned additions follow current object scale, without saved proposals", (
     ),
   );
 });
+
+test("a hard-rejected location cannot return through proposals or learned scanning", () => {
+  const im = scene(),
+    a = d("a", 35, 35),
+    b = d("b", 90, 65, "manual");
+  const model = learnCorrections(im, [a], [a, b], analysis([]).roi, "pill");
+  const result = {
+    ...analysis([a]),
+    rejectedCandidates: [{ ...b, flags: ["新しい1錠分の内部領域がない"] }],
+  };
+  assert.equal(applyLearning(im, result, model).learning?.added, 0);
+  // A soft confidence rejection can still benefit from a genuine correction.
+  result.rejectedCandidates[0].flags = [];
+  assert.equal(applyLearning(im, result, model).learning?.added, 1);
+});
+
+test("duplicate correction learns occupancy, preserves isolated pills and survives serialization", () => {
+  const im = scene(),
+    a = d("a", 35, 35),
+    dupe = d("dupe", 39, 35, "ai");
+  const model = JSON.parse(
+    JSON.stringify(
+      learnCorrections(im, [a, dupe], [a], analysis([]).roi, "pill"),
+    ),
+  );
+  assert.ok(validModel(model));
+  assert.ok(model.units.some((u: any) => u.kind === "duplicate"));
+  assert.ok(model.units.every((u: any) => u.kind !== "remove"));
+  const output = applyLearning(
+    im,
+    analysis([dupe, a, d("isolated", 90, 65, "ai")]),
+    model,
+  );
+  assert.equal(output.learning?.removed, 1);
+  assert.equal(output.detections.length, 2);
+  assert.ok(output.detections.some((d) => d.center.x === 90));
+});
