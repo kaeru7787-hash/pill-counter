@@ -45,3 +45,13 @@ export async function loadImage(
     URL.revokeObjectURL(url);
   }
 }
+
+export async function imageHash(canvas: HTMLCanvasElement) {
+  const bytes = canvas
+    .getContext("2d")!
+    .getImageData(0, 0, canvas.width, canvas.height).data;
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)]
+    .map((v) => v.toString(16).padStart(2, "0"))
+    .join("");
+}

@@ -123,6 +123,7 @@ export async function detectAI(
   tiles?: AICandidate[];
   status: string;
   failed?: boolean;
+  model?: { target: "pill" | "bottle"; url: string; sha256?: string };
 }> {
   try {
     let config = { ...defaults };
@@ -224,7 +225,7 @@ export async function detectAI(
       executionProviders: ["wasm"],
     });
     try {
-      return await inferViews(
+      const result = await inferViews(
         image,
         roi,
         config,
@@ -233,6 +234,7 @@ export async function detectAI(
         cvCandidates,
         modelKind === "pill",
       );
+      return { ...result, model: { target: modelKind, url: modelURL.href, sha256: config.sha256 } };
     } finally {
       await session.release();
     }

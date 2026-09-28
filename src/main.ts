@@ -3,11 +3,9 @@ import "./pictokun.css";
 import { parameterHTML, readParameters } from "./components/Parameters";
 import { ImageViewer, type Mode } from "./components/ImageViewer";
 import { ResultExport } from "./components/ResultExport";
-import { AutoLearning } from "./components/AutoLearning";
-import { imageHash } from "./learningStore";
-import { ResultZoom } from "./components/ResultZoom";
+import { removeLegacyLearning } from "./retiredLearning";
 import { ComicGuide } from "./components/ComicGuide";
-import { loadImage } from "./image";
+import { loadImage, imageHash } from "./image";
 import { saveRecord, exportRecords, clearRecords } from "./storage";
 import type {
   Analysis,
@@ -25,30 +23,26 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 <div id="status" class="status" role="status" aria-live="polite">写真を選ぶと解析を開始します。</div><button id="cancel" class="text-button" hidden>解析を中止</button>
 <div class="workspace"><section class="viewer-panel"><div class="panel-heading"><h2>検出画像</h2><span id="image-meta">未選択</span></div>
 <div id="empty" class="empty"><div class="frame-mark">＋</div><h3>数える対象の写真を読み込む</h3><button id="demo" class="text-button">合成サンプルで試す →</button></div>
-<div id="canvas-wrap" hidden><canvas id="image-canvas" aria-label="検出画像。下の操作モードで追加・削除・範囲指定できます"></canvas></div>
-<div class="toolbar" aria-label="画像の操作"><button data-mode="select" aria-pressed="true">選択</button><button data-mode="add" aria-pressed="false">＋ 追加</button><button data-mode="delete" aria-pressed="false">− 削除</button><button data-mode="roi" aria-pressed="false">範囲指定</button><button data-mode="batch" aria-pressed="false">範囲削除</button><button id="undo" disabled>元に戻す</button><button id="redo" disabled>やり直す</button><button id="reset-detections" disabled>補正を全リセット</button></div>
-<p id="mode-hint" class="hint">番号をタップして選択</p>
-<div class="viewer-actions"><button id="open-result-zoom" disabled>番号付き画像を拡大</button></div>
-<div class="viewer-actions"><label>拡大 <input id="zoom" type="range" min="1" max="3" step=".25" value="1"></label><button id="delete-selected" disabled>選択を削除</button><button id="reset-roi" disabled>範囲を解除</button></div>
+<div id="canvas-wrap" hidden><canvas id="image-canvas" aria-label="検出画像。選択中は2本指で拡大縮小。追加・削除に切り替えて編集できます"></canvas></div>
+<div class="toolbar" aria-label="画像の操作"><button data-mode="select" aria-pressed="true">選択</button><button data-mode="add" aria-pressed="false">＋ 追加</button><button data-mode="delete" aria-pressed="false">− 削除</button><button id="undo" disabled>元に戻す</button><button id="redo" disabled>やり直す</button><button id="reset-detections" disabled>補正を全リセット</button></div>
+<p id="mode-hint" class="hint">番号をタップして選択。2本指で拡大・縮小、拡大後は1本指で移動。</p>
+<div class="viewer-actions"><label>拡大 <input id="zoom" type="range" min="1" max="8" step=".01" value="1"></label><output id="zoom-value" aria-live="off">100%</output><button id="fit-image" disabled>全体を表示</button><button id="delete-selected" disabled>選択を削除</button></div>
 <details id="detection-list"><summary>検出一覧</summary><div id="list"></div></details>
 </section>
 <aside><section class="result-panel"><p class="eyebrow" id="count-label">自動検出</p><div class="count"><span id="count">—</span><span class="unit">錠</span></div><div class="result-export"><button id="save-result-image" class="button primary full" disabled>結果画像を保存</button><p id="result-export-status" class="muted" role="status">計数後に保存できます。</p><button id="download-result-image" hidden disabled>ファイルとして保存</button></div><div class="confidence-row"><span>信頼度</span><strong id="confidence" class="badge neutral">未解析</strong></div><p id="auto-count" class="muted"></p><p id="ai-summary" class="ai-summary"></p><details><summary>解析情報</summary><p id="ai-status" class="muted"></p><ul id="reasons"></ul><p id="analysis-info" class="muted">未解析</p></details><div id="votes" class="votes" ${developerMode ? "" : "hidden"}></div><p class="disclaimer">最終確認は、番号と実物を見比べてください。</p></section>
 <section class="settings-panel" ${developerMode ? "" : "hidden"}><h2>解析設定</h2><label class="field">撮影環境<select id="scene"><option value="tray">黒い計数トレー</option><option value="desk">机・その他の背景</option><option value="bag">透明な分包袋</option></select></label><label class="check"><input id="auto-roi" type="checkbox" checked>黒いトレーの範囲を自動推定</label><label class="check"><input id="debug" type="checkbox">解析表示</label><div id="debug-controls" hidden><label class="field">表示する画像<select id="layer"><option>Original</option><option>Foreground mask</option><option>ROI</option><option>Grayscale</option><option>Threshold</option><option>Morphology</option><option>Markers</option><option>Distance transform</option><option>Watershed</option><option>Contours</option><option selected>Final detections</option></select></label><p id="diagnostics" class="muted"></p></div>${parameterHTML}<label class="field">解析解像度<select id="resolution"><option value="2048">高精度・長辺2048px（標準）</option><option value="3072">長辺3072px</option><option value="10000">元解像度（上限600万画素）</option></select></label><button id="analyze" class="button secondary full" disabled>この設定で再解析</button></section></aside></div>
-<p id="auto-learning-status" class="muted"></p>
 <section class="data-panel" ${developerMode ? "" : "hidden"}><div><h2>検証データ</h2><p>元画像・自動検出・訂正後の結果を、このブラウザ内に保存します。</p><small>元画像には袋の印字も含まれます。書き出す前に内容を確認してください。</small></div><div class="data-actions"><button id="save" disabled>この結果を端末に保存</button><button id="export">検証データを書き出す</button><button id="clear" class="text-button">保存データを削除</button></div></section>
-<footer>錠数ノート v0.14.0 <a href="https://github.com/kaeru7787-hash/pill-counter/archive/refs/heads/main.zip">ソースコードZIP</a><span id="offline">オフライン準備中</span></footer></main>`;
+<footer>錠数ノート v0.15.0 <a href="https://github.com/kaeru7787-hash/pill-counter/archive/refs/heads/main.zip">ソースコードZIP</a><span id="offline">オフライン準備中</span></footer></main>`;
 const $ = <T extends HTMLElement = HTMLElement>(s: string) =>
   document.querySelector<T>(s)!;
 const comicGuide = new ComicGuide($("#open-guide"));
 const viewer = new ImageViewer($<HTMLCanvasElement>("#image-canvas"));
-const resultZoom = new ResultZoom(viewer);
 const resultExport = new ResultExport(
   viewer,
   $<HTMLButtonElement>("#save-result-image"),
   $<HTMLButtonElement>("#download-result-image"),
   $("#result-export-status"),
 );
-$("#open-result-zoom").onclick = () => resultZoom.open($("#open-result-zoom"));
 let image: Raster | undefined,
   original: File | undefined,
   result: Analysis | undefined,
@@ -71,20 +65,22 @@ const settings = (): Settings => ({
   parameters: readParameters(),
 });
 let analyzedSettings: Settings | undefined;
-const learner = new AutoLearning($("#auto-learning-status"));
+// Cleanup is independent of inference, including when another old tab holds the DB.
+void removeLegacyLearning();
 function status(message: string, error = false) {
   $("#status").textContent = message;
   $("#status").classList.toggle("error", error);
 }
 function setBusy(value: boolean) {
   busy = value;
+  if (value) viewer.cancelGesture();
+  $<HTMLInputElement>("#zoom").disabled = value || !image;
   resultExport.setBusy(value || !result);
   $<HTMLSelectElement>("#target").disabled = value;
   $("#cancel").hidden = !value;
-  for (const id of ["analyze", "reset-roi"])
+  for (const id of ["analyze", "fit-image"])
     $<HTMLButtonElement>(`#${id}`).disabled = value || !image;
   $<HTMLButtonElement>("#save").disabled = value || !result;
-  $<HTMLButtonElement>("#open-result-zoom").disabled = value || !result;
   $<HTMLButtonElement>("#undo").disabled = value || !history.length;
   $<HTMLButtonElement>("#delete-selected").disabled = value || !viewer.selected;
   document
@@ -92,10 +88,9 @@ function setBusy(value: boolean) {
     .forEach((b) => (b.disabled = value || !result));
   $("#canvas-wrap").classList.toggle("busy", value);
 }
-function changed(train = true) {
+function changed() {
   viewer.selected = undefined;
   render();
-  if (train && image && result) learner.stage(image, result, viewer.detections);
 }
 function checkpoint() {
   future = [];
@@ -213,21 +208,6 @@ viewer.onAdd = (p) => {
     `1${analyzedSettings?.target === "bottle" ? "本" : "錠"}追加しました。青い輪郭は手動の位置マーカーです。`,
   );
 };
-viewer.onBatch = (r) => {
-  if (busy || !result) return;
-  checkpoint();
-  viewer.detections = viewer.detections.filter(
-    (d) =>
-      d.center.x < r.x ||
-      d.center.y < r.y ||
-      d.center.x > r.x + r.width ||
-      d.center.y > r.y + r.height,
-  );
-  changed();
-};
-viewer.onROI = () => {
-  void run();
-};
 async function run() {
   if (!image) return;
   if (
@@ -247,11 +227,6 @@ async function run() {
     status(String(e), true);
     return;
   }
-  const pendingImage = image,
-    pendingRevision = revision;
-  await learner.ready;
-  if (image !== pendingImage || revision !== pendingRevision) return false;
-  learner.finish();
   worker?.terminate();
   clearTimeout(timer);
   const id = ++revision;
@@ -295,7 +270,6 @@ async function run() {
       fail(event.data.error);
       return;
     }
-    learner.begin(recordID, runSettings.target || "pill");
     result = event.data.result!;
     analyzedSettings = runSettings;
     viewer.analysis = result;
@@ -304,8 +278,7 @@ async function run() {
     future = [];
     worker?.terminate();
     setBusy(false);
-    changed(false);
-    learner.report(result);
+    changed();
     status(
       `解析完了（${(result.elapsed / 1000).toFixed(1)}秒）。すべての番号と数え漏れを確認してください。`,
     );
@@ -315,7 +288,6 @@ async function run() {
     image,
     settings: runSettings,
     baseURL: new URL(import.meta.env.BASE_URL, location.href).href,
-    learningModel: learner.model(runSettings.target || "pill"),
   });
   return true;
 }
@@ -333,7 +305,6 @@ async function open(file: File) {
     if (loadID !== revision) return;
     const photoID = await imageHash(loaded.canvas);
     if (loadID !== revision) return;
-    learner.finish();
     if (viewer.original) {
       viewer.original.width = viewer.original.height = 1;
     }
@@ -364,9 +335,8 @@ async function open(file: File) {
     $("#confidence").className = "badge neutral";
     $("#reasons").replaceChildren();
     $("#votes").textContent = "";
-    $<HTMLInputElement>("#zoom").value = "1";
-    viewer.canvas.style.width = "100%";
     viewer.draw();
+    viewer.resetView();
     await run();
   } catch (e) {
     if (loadID !== revision) return;
@@ -390,16 +360,10 @@ document.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach(
         .forEach((b) => b.setAttribute("aria-pressed", String(b === button)));
       viewer.layer = "Final detections";
       $<HTMLSelectElement>("#layer").value = viewer.layer;
-      viewer.canvas.style.touchAction =
-        viewer.mode === "roi" || viewer.mode === "batch"
-          ? "none"
-          : "pan-x pan-y";
       $("#mode-hint").textContent = {
-        batch: "ドラッグした範囲内の検出を一括削除します。",
-        select: "番号をタップして選択します。",
+        select: "番号をタップして選択。2本指で拡大・縮小、拡大後は1本指で移動。",
         add: "数え漏れの中心をタップして追加します。",
         delete: "誤検出の番号または輪郭内をタップして削除します。",
-        roi: "画像上をドラッグして「この範囲だけ数える」矩形を指定します。",
       }[viewer.mode];
       viewer.draw();
     }),
@@ -465,14 +429,13 @@ $("#resolution").onchange = () => {
 $("#delete-selected").onclick = () => {
   if (viewer.selected) remove(viewer.selected);
 };
-$("#reset-roi").onclick = () => {
-  viewer.roi = undefined;
-  $<HTMLInputElement>("#auto-roi").checked = false;
-  void run();
+$("#fit-image").onclick = () => viewer.resetView();
+viewer.onZoom = (scale) => {
+  $<HTMLInputElement>("#zoom").value = String(scale);
+  $("#zoom-value").textContent = `${Math.round(scale*100)}%`;
 };
 $<HTMLInputElement>("#zoom").oninput = (e) => {
-  viewer.canvas.style.width = `${Number((e.target as HTMLInputElement).value) * 100}%`;
-  viewer.draw();
+  viewer.zoom(Number((e.target as HTMLInputElement).value));
 };
 $<HTMLInputElement>("#debug").onchange = () => {
   $("#debug-controls").hidden = !$<HTMLInputElement>("#debug").checked;
@@ -585,4 +548,3 @@ $<HTMLSelectElement>("#target").onchange = async () => {
     }
   }
 };
-

@@ -34,7 +34,7 @@ test("JPEG EXIF orientation is applied before overlay coordinates", async ({
 });
 test.describe("editing with deterministic CV fallback", () => {
   test.use({ serviceWorkers: "block" });
-  test("camera controls, analysis, numbering, corrections, ROI, debug and local export", async ({
+  test("camera controls, analysis, numbering, corrections, debug and local export", async ({
     page,
   }) => {
     const errors: string[] = [];
@@ -99,28 +99,7 @@ test.describe("editing with deterministic CV fallback", () => {
     await expect(page.locator("#count")).toHaveText("24");
     await page.locator("#layer").selectOption("Distance transform");
     await expect(page.locator("#diagnostics")).toContainText("Otsu");
-    await page.locator('[data-mode="roi"]').click();
-    await page.locator("#canvas-wrap").evaluate((el) => {
-      el.scrollTop = 0;
-      el.scrollLeft = 0;
-      el.scrollIntoView({ block: "start" });
-    });
-    const rect = (await canvas.boundingBox())!;
-    await page.mouse.move(
-      rect.x + (rect.width * 15) / 640,
-      rect.y + (rect.height * 15) / 480,
-    );
-    await page.mouse.down();
-    await page.mouse.move(
-      rect.x + (rect.width * 180) / 640,
-      rect.y + (rect.height * 85) / 480,
-      { steps: 10 },
-    );
-    await page.mouse.up();
-    await expect(page.locator("#count")).toHaveText("2");
-    await expect(page.locator("#status")).toContainText("解析完了");
-    await page.locator("#reset-roi").click();
-    await expect(page.locator("#count")).toHaveText("24");
+    await expect(page.locator('[data-mode="roi"], [data-mode="batch"], #reset-roi')).toHaveCount(0);
     expect(outgoing).toEqual([]);
     expect(errors).toEqual([]);
     const overflow = await page.evaluate(
@@ -192,7 +171,7 @@ test("PWA reload and fresh analysis work with the origin server stopped", async 
   }
 });
 
-test("real tray: 90 spatially supported detections, debug layers and batch correction", async ({
+test("real tray: 90 spatially supported detections, debug layers and correction", async ({
   page,
 }) => {
   test.setTimeout(120000);
@@ -219,21 +198,10 @@ test("real tray: 90 spatially supported detections, debug layers and batch corre
     "Final detections",
   ])
     await page.locator("#layer").selectOption(layer);
-  await page.locator('[data-mode="batch"]').click();
-  const canvas = page.locator("#image-canvas");
-  await page.locator("#canvas-wrap").evaluate((el) => {
-    el.scrollTop = 0;
-    el.scrollLeft = 0;
-    el.scrollIntoView({ block: "start" });
-  });
-  const r = (await canvas.boundingBox())!;
-  await page.mouse.move(r.x + r.width * 0.19, r.y + r.height * 0.25);
-  await page.mouse.down();
-  await page.mouse.move(r.x + r.width * 0.44, r.y + r.height * 0.39, {
-    steps: 10,
-  });
-  await page.mouse.up();
-  await expect(page.locator("#count")).not.toHaveText("90");
+  await page.locator("#detection-list summary").click();
+  await page.locator("#list button").first().click();
+  await page.locator("#delete-selected").click();
+  await expect(page.locator("#count")).toHaveText("89");
   await page.locator("#undo").click();
   await expect(page.locator("#count")).toHaveText("90");
   await page.screenshot({

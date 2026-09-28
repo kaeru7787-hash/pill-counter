@@ -64,17 +64,16 @@ export type Analysis = {
   diagnostics: string[];
   elapsed: number;
   aiStatus?: string;
+  model?: { target: "pill" | "bottle"; url: string; sha256?: string };
   algorithm?: string;
   estimatedDiameter?: number;
   candidates?: Detection[];
   rejectedCandidates?: Detection[];
-  learning?: {updates:number;added:number;removed:number};
 };
 export type WorkerRequest = {
   id: number;
   image: Raster;
   settings: Settings;
   baseURL: string;
-  learningModel?: import('../autoLearning').LocalModel;
 };
 export type WorkerResponse = { id: number; result?: Analysis; error?: string };

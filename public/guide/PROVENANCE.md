@@ -14,3 +14,9 @@ Create one app mascot illustration matching the green faceless pictogram people 
 
 ## v0.11.0
 01-count.png and 03-save.png edited with the built-in image generator. Section 3 now describes always-on target-specific AI; section 11 describes automatic on-device correction learning and deletion of training images. Other sections are preserved. Both outputs visually inspected.
+
+## v0.15.0
+03-save.png edited with built-in ImageGen. Panel 11 now describes saving the corrected result and checking each new photo independently; automatic learning claims were removed. Footer updated to v0.15.0. Output visually inspected.
+
+### v0.15.0 直接ピンチ編集
+02-edit.png was edited with built-in ImageGen and visually inspected. Prompt: preserve page 2/3, green medical pictogram mascot and navy/mint palette; replace range controls and separate zoom view with four panels: basic select/add/delete; pinch and pan only in select mode; undo/redo/reset; edit while keeping zoom and position, zoom slider and fit image. Footer: 確認できたら、保存へ and v0.15.0. Remove all learning references.
