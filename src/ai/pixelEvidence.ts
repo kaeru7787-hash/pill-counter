@@ -1,5 +1,6 @@
 import type { Detection, Raster } from "../types";
 import { appearance } from "./candidateReview";
+import { contains, singleObjectContours } from "./objectIdentity";
 
 const median = (v: number[]) =>
   [...v].sort((a, b) => a - b)[Math.floor(v.length / 2)] || 0;
@@ -140,7 +141,16 @@ export function pixelRejection(
   let n = 0,
     matching = 0,
     freeMatching = 0,
-    occupied = 0;
+    occupied = 0,
+    ownedMatching = 0;
+  const singles = singleObjectContours(neighbors).filter(
+    (p) =>
+      p !== d &&
+      p.box.x <= d.box.x + d.box.width &&
+      p.box.x + p.box.width >= d.box.x &&
+      p.box.y <= d.box.y + d.box.height &&
+      p.box.y + p.box.height >= d.box.y,
+  );
   const lights: number[] = [],
     outer: number[] = [],
     chroma: number[] = [];
@@ -179,6 +189,7 @@ export function pixelRejection(
       if (owns) occupied++;
       if (Math.hypot(...c.map((v, i) => v - rgb[i])) < tolerance) {
         matching++;
+        if (singles.some((p) => contains(p, { x: px, y: py }))) ownedMatching++;
         if (!owns) freeMatching++;
       }
     }
@@ -216,6 +227,13 @@ export function pixelRejection(
   // A dark score line alone cannot fail the sampled interior coverage.
   if (matching / n < 0.25 && center < refLight * 0.84 && center - surround < 12)
     return ["内部が錠剤群の色と異なる", "周囲から独立した錠剤領域がない"];
+  // Bright existing tablets are not new foreground either. Use measured
+  // single-body contours here, not padded AI boxes or display circles.
+  if (matching >= n * 0.25 && ownedMatching / matching > 0.9)
+    return [
+      "検出済み輪郭の画素を再利用する候補",
+      "新しい1錠分の内部領域がない",
+    ];
   // A candidate in a gap must contain new foreground, not just adjacent pills.
   if (
     occupied / n > 0.2 &&

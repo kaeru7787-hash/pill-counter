@@ -4,17 +4,7 @@ import { contextualPixelReference, pixelRejection } from "./pixelEvidence";
 
 export const DUPLICATE = "検出済み輪郭の内部にある重複候補";
 export const HARD_REJECTION = "追加抑制:背景または重複";
-export function hardRejected(d: Detection) {
-  return d.flags.some(
-    (f) =>
-      f === HARD_REJECTION ||
-      /新しい1錠分の内部領域がない|内部が錠剤群の色と異なる|候補自身の外周が確認できない|錠剤群の色成分がない|重複候補|接触輪郭をAIの個体候補に置換/.test(
-        f,
-      ),
-  );
-}
-
-/** Shared by foundation-AI additions and local learned additions. No filename,
+/** Guard for foundation-AI additions. No filename,
  * expected count or global single-tray crop is used. Multiple trays are allowed. */
 export function additionGuard(
   image: Raster | undefined,
