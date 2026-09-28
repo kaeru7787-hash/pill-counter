@@ -24,13 +24,11 @@ async function sample(shift = 0) {
     .toBuffer();
 }
 async function load(page: any, shift = 0) {
-  await page
-    .locator("#file")
-    .setInputFiles({
-      name: "sample.png",
-      mimeType: "image/png",
-      buffer: await sample(shift),
-    });
+  await page.locator("#file").setInputFiles({
+    name: "sample.png",
+    mimeType: "image/png",
+    buffer: await sample(shift),
+  });
   await expect(page.locator("#status")).toContainText("解析完了");
 }
 test("correction trains immediately, next photo uses learned weights, no training images persist", async ({
@@ -41,16 +39,15 @@ test("correction trains immediately, next photo uses learned weights, no trainin
     if (r.method() !== "GET") posts.push(r.url());
   });
   await expect(page.locator("#ai-enabled")).toHaveCount(0);
+  await expect(page.locator("#confirmed")).toHaveCount(0);
   await expect(page.locator("[data-learn]")).toHaveCount(0);
   await load(page);
   await expect(page.locator("#count")).toHaveText("3");
   await page.locator('[data-mode="delete"]').click();
   const b = (await page.locator("#image-canvas").boundingBox())!;
-  await page
-    .locator("#image-canvas")
-    .click({
-      position: { x: (b.width * 440) / 640, y: (b.height * 160) / 480 },
-    });
+  await page.locator("#image-canvas").click({
+    position: { x: (b.width * 440) / 640, y: (b.height * 160) / 480 },
+  });
   await expect(page.locator("#count")).toHaveText("2");
   expect(
     (await model(page)).recent.model.units.some(
@@ -62,6 +59,9 @@ test("correction trains immediately, next photo uses learned weights, no trainin
   await expect(page.locator("#count")).toHaveText("2");
   await page.getByText("解析情報", { exact: true }).click();
   await expect(page.locator("#analysis-info")).toContainText("除外 1");
+  await expect(page.locator("#auto-learning-status")).toContainText(
+    "今回の反映：追加 0 / 除外 1",
+  );
   const stored = JSON.stringify(await model(page));
   expect(stored).not.toMatch(/imagePNG|data:image|filename|center/);
   expect(
@@ -89,11 +89,9 @@ test("undo replaces training, pagehide completes once, reload recovers interrupt
   await load(page);
   await page.locator('[data-mode="delete"]').click();
   const b = (await page.locator("#image-canvas").boundingBox())!;
-  await page
-    .locator("#image-canvas")
-    .click({
-      position: { x: (b.width * 440) / 640, y: (b.height * 160) / 480 },
-    });
+  await page.locator("#image-canvas").click({
+    position: { x: (b.width * 440) / 640, y: (b.height * 160) / 480 },
+  });
   await page.locator("#undo").click();
   expect(
     (await model(page)).recent.model.units.some(
@@ -103,7 +101,7 @@ test("undo replaces training, pagehide completes once, reload recovers interrupt
   await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
   expect((await model(page)).recent.complete).toBe(true);
   await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
-  expect((await model(page)).recent.model.updates).toBe(1);
+  expect((await model(page)).recent.model.updates).toBe(0);
   await page.reload();
   await load(page, 20);
   await expect(page.locator("#count")).toHaveText("3");
@@ -118,10 +116,13 @@ test("persistence failure is visible without losing editing", async ({
     };
   });
   await load(page);
+  await page.locator("#detection-list summary").click();
+  await page.locator("#list button").first().click();
+  await page.locator("#delete-selected").click();
   await expect(page.locator("#auto-learning-status")).toContainText(
     "保存できません",
   );
-  await expect(page.locator("#count")).toHaveText("3");
+  await expect(page.locator("#count")).toHaveText("2");
 });
 test("legacy training records are removed only after actual weights are durable", async ({
   page,
