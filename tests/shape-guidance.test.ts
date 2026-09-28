@@ -61,7 +61,7 @@ test("AI circle follows nearby optical size, ignores fragments and falls back wi
 });
 
 import { additionGuard } from "../src/ai/additionGuard";
-test("AI and learned additions cannot borrow foreground from blue apertures or a gray gap", () => {
+test("AI additions cannot borrow foreground from blue apertures or a gray gap", () => {
   const image = {
     width: 400,
     height: 300,
