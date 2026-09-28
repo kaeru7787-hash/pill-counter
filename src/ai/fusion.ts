@@ -8,11 +8,15 @@ import {
 import type { AICandidate } from "./onnxDetector";
 import { iou } from "./onnxDetector";
 import { pixelReference, pixelRejection } from "./pixelEvidence";
+import { overlappingObject, contains } from "./objectIdentity";
+import { additionGuard } from "./additionGuard";
+export { contains } from "./objectIdentity";
 export function sameObject(a: Detection, b: Detection) {
   return (
-    iou(a.box, b.box) > 0.3 &&
-    Math.hypot(a.center.x - b.center.x, a.center.y - b.center.y) <
-      0.4 * Math.sqrt(Math.min(a.area, b.area))
+    overlappingObject(a, b) ||
+    (iou(a.box, b.box) > 0.3 &&
+      Math.hypot(a.center.x - b.center.x, a.center.y - b.center.y) <
+        0.4 * Math.sqrt(Math.min(a.area, b.area)))
   );
 }
 export function fuse(
@@ -49,7 +53,30 @@ export function fuse(
       rejected.push({ ...d, flags: [...d.flags, ...reasons] });
     return reasons.length > 0;
   };
+  const cleanShapes = cv.filter(
+    (c) => c.shape && c.shape.solidity > 0.93 && c.shape.circularity > 0.45,
+  );
+  const elongatedFamily =
+    cleanShapes.length >= 8 &&
+    cleanShapes.filter((c) => c.shape!.aspect > 1.55).length /
+      cleanShapes.length >
+      0.8;
   const accepted = cv.filter((c) => {
+    // A nearly square CV region in a strongly oblong family often spans parts
+    // of two touching pills. Let independently supported AI instances replace
+    // that merged region instead of letting it claim both foregrounds.
+    if (
+      elongatedFamily &&
+      c.shape &&
+      c.shape.aspect < 1.5 &&
+      stable.some((a) => contains(c, a.center))
+    ) {
+      rejected.push({
+        ...c,
+        flags: [...c.flags, "接触輪郭をAIの個体候補に置換"],
+      });
+      return false;
+    }
     if (veto(c, references)) return false;
     if (stable.some((a) => associated(c, a))) return true;
     const reasons = anomalyReasons(c, profile, image);
@@ -92,6 +119,7 @@ export function fuse(
     replaced: Detection[] = [],
     added: AICandidate[] = [];
   const detections = [...accepted];
+  const guard = additionGuard(image, accepted);
   for (const [index, a] of stable.entries()) {
     const group = groups[index];
     if (veto(a, accepted)) continue;
@@ -116,22 +144,9 @@ export function fuse(
         flags: [...a.flags, "AI merged CV fragments: manual review required"],
       });
     } else if (!group.length) {
-      // A second AI box can be shifted onto the edge of a tablet whose centre
-      // was already matched to another view. Do not add it inside a complete,
-      // independently measured foreground contour.
-      const covered = accepted.some(
-        (c) =>
-          c.shape &&
-          c.shape.solidity > 0.9 &&
-          c.area > profile.area * 0.65 &&
-          c.area < profile.area * 1.5 &&
-          contains(c, a.center),
-      );
-      if (covered) {
-        rejected.push({
-          ...a,
-          flags: [...a.flags, "検出済み輪郭の内部にある重複候補"],
-        });
+      const reasons = guard(a, detections);
+      if (reasons.length) {
+        rejected.push({ ...a, flags: [...a.flags, ...reasons] });
         continue;
       }
       detections.push({
@@ -152,18 +167,4 @@ export function fuse(
     requiresReview:
       added.length > 0 || removed.length > 0 || rejected.length > 0,
   };
-}
-
-export function contains(d: Detection, p: { x: number; y: number }) {
-  let inside = false;
-  for (let i = 0, j = d.contour.length - 1; i < d.contour.length; j = i++) {
-    const a = d.contour[i],
-      b = d.contour[j];
-    if (
-      a.y > p.y !== b.y > p.y &&
-      p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x
-    )
-      inside = !inside;
-  }
-  return inside;
 }
