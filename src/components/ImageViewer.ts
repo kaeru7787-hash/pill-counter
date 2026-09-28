@@ -1,70 +1,138 @@
 import type { Analysis, Detection, Point, ROI } from "../types";
 import { aiMarkerRadius } from "./markerSize";
-export type Mode = "select" | "add" | "delete" | "roi" | "batch";
+export type Mode = "select" | "add" | "delete";
 export class ImageViewer {
   original?: HTMLCanvasElement;
   analysis?: Analysis;
   detections: Detection[] = [];
   selected?: string;
-  mode: Mode = "select";
+  private activeMode: Mode = "select";
+  get mode() { return this.activeMode; }
+  set mode(value: Mode) { this.cancelGesture(); this.activeMode = value; }
   layer = "Final detections";
   roi?: ROI;
+  private pointers = new Map<number, Point>();
   private start?: Point;
-  private dragging?: ROI;
+  private moved = false;
+  private scale = 1;
+  private x = 0;
+  private y = 0;
+  private width = 0;
+  private height = 0;
+  private viewport: HTMLElement;
+  onZoom: (scale: number) => void = () => {};
   onSelect: (id?: string) => void = () => {};
   onAdd: (p: Point) => void = () => {};
   onDelete: (id: string) => void = () => {};
-  onROI: (roi: ROI) => void = () => {};
-  onBatch: (roi: ROI) => void = () => {};
   constructor(public canvas: HTMLCanvasElement) {
-    canvas.addEventListener("pointerdown", (e) => {
-      if (!this.original) return;
-      this.start = this.point(e);
-      canvas.setPointerCapture(e.pointerId);
+    const v = this.viewport = canvas.parentElement!;
+    new ResizeObserver(() => this.fit()).observe(v);
+    window.addEventListener("resize", () => this.fit());
+    v.addEventListener("pointerdown", (e) => {
+      if (!this.original || (e.pointerType === "mouse" && e.button !== 0)) return;
+      if (!this.pointers.size) {
+        this.start = { x: e.clientX, y: e.clientY };
+        this.moved = false;
+      } else this.moved = true;
+      this.pointers.set(e.pointerId, this.local(e));
+      v.setPointerCapture(e.pointerId);
     });
-    canvas.addEventListener("pointermove", (e) => {
-      if ((this.mode === "roi" || this.mode === "batch") && this.start) {
-        this.dragging = this.rectangle(this.start, this.point(e));
-        this.draw();
+    v.addEventListener("pointermove", (e) => {
+      const old = this.pointers.get(e.pointerId);
+      if (!old) return;
+      const before = [...this.pointers.values()];
+      const next = this.local(e);
+      this.pointers.set(e.pointerId, next);
+      if (this.start && Math.hypot(e.clientX-this.start.x, e.clientY-this.start.y) > 6)
+        this.moved = true;
+      if (this.mode !== "select") return;
+      if (this.pointers.size === 2) {
+        const after = [...this.pointers.values()];
+        const distance = (p: Point[]) => Math.hypot(p[0].x-p[1].x, p[0].y-p[1].y);
+        const mid = (p: Point[]) => ({ x: (p[0].x+p[1].x)/2, y: (p[0].y+p[1].y)/2 });
+        const a = mid(before), b = mid(after);
+        const scale = this.clamp(this.scale * distance(after)/Math.max(1, distance(before)));
+        const ratio = scale/this.scale;
+        this.x = b.x-(a.x-this.x)*ratio;
+        this.y = b.y-(a.y-this.y)*ratio;
+        this.scale = scale;
+      } else if (this.pointers.size === 1 && this.moved) {
+        this.x += next.x-old.x;
+        this.y += next.y-old.y;
       }
+      this.paint();
     });
-    canvas.addEventListener("pointercancel", () => {
-      this.start = undefined;
-      this.dragging = undefined;
-      this.draw();
-    });
-    canvas.addEventListener("pointerup", (e) => {
-      if (!this.start) return;
-      const p = this.point(e),
-        start = this.start;
-      this.start = undefined;
-      if (this.mode === "roi" || this.mode === "batch") {
-        const r = this.rectangle(start, p);
-        this.dragging = undefined;
-        if (
-          r.width > this.canvas.width * 0.025 &&
-          r.height > this.canvas.height * 0.025
-        ) {
-          if (this.mode === "batch") this.onBatch(r);
-          else {
-            this.roi = r;
-            this.onROI(r);
-          }
-        }
-        this.draw();
-        return;
-      }
-      if (Math.hypot(p.x - start.x, p.y - start.y) > this.canvas.width * 0.03)
-        return;
-      const d = this.hit(p);
+    v.addEventListener("pointerup", (e) => {
+      if (!this.pointers.has(e.pointerId)) return;
+      const tap = !this.moved && this.pointers.size === 1 && this.start &&
+        Math.hypot(e.clientX-this.start.x,e.clientY-this.start.y) <= 6;
+      this.pointers.delete(e.pointerId);
+      if (!tap) return;
+      const rect = canvas.getBoundingClientRect();
+      if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) return;
+      const p = this.point(e), d = this.hit(p);
       if (this.mode === "add") this.onAdd(p);
       else if (this.mode === "delete" && d) this.onDelete(d.id);
-      else {
+      else if (this.mode === "select") {
         this.selected = d?.id;
         this.onSelect(d?.id);
         this.draw();
       }
     });
+    const cancel = (e: PointerEvent) => {
+      if (this.pointers.has(e.pointerId)) { this.pointers.delete(e.pointerId); this.moved = true; }
+    };
+    v.addEventListener("pointercancel", cancel);
+    v.addEventListener("lostpointercapture", cancel);
+    v.addEventListener("wheel", (e) => {
+      if (this.mode !== "select" || !e.ctrlKey) return;
+      e.preventDefault();
+      this.zoom(this.scale * Math.exp(-e.deltaY * .01), this.local(e));
+    }, { passive: false });
+  }
+  cancelGesture() {
+    this.pointers.clear();
+    this.start = undefined;
+    this.moved = true;
+  }
+  resetView() {
+    this.cancelGesture();
+    this.scale = 1;
+    this.x = this.y = 0;
+    this.fit();
+  }
+  private local(e: MouseEvent): Point {
+    const r = this.viewport.getBoundingClientRect();
+    return { x: e.clientX-r.left-r.width/2, y: e.clientY-r.top-r.height/2 };
+  }
+  private clamp(scale: number) { return Math.max(1, Math.min(8, scale)); }
+  zoom(scale: number, anchor: Point = { x: 0, y: 0 }) {
+    const next = this.clamp(scale), ratio = next/this.scale;
+    this.x = anchor.x-(anchor.x-this.x)*ratio;
+    this.y = anchor.y-(anchor.y-this.y)*ratio;
+    this.scale = next;
+    this.paint();
+  }
+  private fit() {
+    if (!this.original || !this.viewport.clientWidth) return;
+    const height = Math.min(this.viewport.clientWidth*this.original.height/this.original.width, innerHeight*.65);
+    this.viewport.style.height = `${height}px`;
+    const factor = Math.min(this.viewport.clientWidth/this.original.width, height/this.original.height);
+    const width = this.original.width*factor;
+    if (this.width) { this.x *= width/this.width; this.y *= width/this.width; }
+    this.width = width;
+    this.height = this.original.height*factor;
+    this.canvas.style.width = `${this.width}px`;
+    this.canvas.style.height = `${this.height}px`;
+    this.paint();
+  }
+  private paint() {
+    const maxX = Math.max(0,(this.width*this.scale-this.viewport.clientWidth)/2);
+    const maxY = Math.max(0,(this.height*this.scale-this.viewport.clientHeight)/2);
+    this.x = Math.max(-maxX, Math.min(maxX, this.x));
+    this.y = Math.max(-maxY, Math.min(maxY, this.y));
+    this.canvas.style.transform = `translate(${this.x}px, ${this.y}px) scale(${this.scale})`;
+    this.onZoom(this.scale);
   }
   private point(e: PointerEvent): Point {
     const r = this.canvas.getBoundingClientRect();
@@ -83,14 +151,6 @@ export class ImageViewer {
           ((e.clientY - r.top) * this.canvas.height) / r.height,
         ),
       ),
-    };
-  }
-  private rectangle(a: Point, b: Point): ROI {
-    return {
-      x: Math.round(Math.min(a.x, b.x)),
-      y: Math.round(Math.min(a.y, b.y)),
-      width: Math.round(Math.abs(a.x - b.x)),
-      height: Math.round(Math.abs(a.y - b.y)),
     };
   }
   private hit(p: Point) {
@@ -182,7 +242,7 @@ export class ImageViewer {
         ctx.stroke();
         if (layer === "Contours") return;
         const screenScale =
-            c.width / Math.max(1, this.canvas.getBoundingClientRect().width),
+            c.width / Math.max(1, finalOnly ? Math.min(c.width, 960) : this.canvas.getBoundingClientRect().width),
           nearest = Math.min(
             ...this.detections
               .filter((e) => e.id !== d.id)
@@ -208,7 +268,7 @@ export class ImageViewer {
         ctx.textBaseline = "middle";
         ctx.fillText(String(i + 1), d.center.x, d.center.y + 0.5);
       });
-    const roi = this.dragging || this.roi || this.analysis?.roi;
+    const roi = this.roi || this.analysis?.roi;
     if (roi && !finalOnly) {
       ctx.strokeStyle = "#ffcf60";
       ctx.lineWidth = Math.max(2, c.width / 400);

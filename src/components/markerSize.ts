@@ -1,6 +1,6 @@
 import type { Detection } from "../types";
 
-// Display geometry only. Preserve measured contours for inference and learning.
+// Display geometry only. Preserve measured contours for inference.
 export function aiMarkerRadius(d: Detection, detections: Detection[]): number {
   const fallback = Math.sqrt(d.box.width * d.box.height) / 2;
   const nearby = detections
