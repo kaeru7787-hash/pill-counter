@@ -7,7 +7,7 @@
 .guide-button:hover { background: #bdebd4; }
 .primary, .button.primary { background: #07874b; border-color: #07874b; color: white; }
 .secondary, .button.secondary { background: #103654; border-color: #103654; color: white; }
-.upload-panel, .viewer-panel, .result-panel, .learning-panel { border: 2px solid #b3cec2; background: white; }
+.upload-panel, .viewer-panel, .result-panel { border: 2px solid #b3cec2; background: white; }
 .panel-heading { background: #e4f7ed; border-radius: 14px 14px 0 0; }
 .toolbar button[aria-pressed="true"] { background: #d9f4e7; border-color: #07874b; color: #065c35; }
 .model-label { display: inline-block; font-size: 12px; border-radius: 20px; padding: 3px 9px; color: #103654; background: #e7eff6; }
