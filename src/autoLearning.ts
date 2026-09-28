@@ -124,6 +124,9 @@ export function learnCorrections(
             c.center.y <= d.box.y + d.box.height),
       ),
   );
+  // Do not reinforce an untouched prediction as if the user corrected it.
+  if (!added.length && !automatic.some((d) => !currentIDs.has(d.id)))
+    return model;
   for (const [kind, items] of [
     ["keep", retained],
     ["add", added],
@@ -146,10 +149,28 @@ export function learnCorrections(
   model.updates = model.units.length ? 1 : 0;
   return model;
 }
+/** Preserve colour differences and contrast while allowing a bounded change in
+ * exposure. Raw features remain compatible with previously learned models. */
+export function appearanceDistance(a: number[], b: number[]) {
+  const indices = [0, 1, 2, 6, 7, 8, 12, 13, 14];
+  const shift =
+    indices.reduce((sum, i) => sum + a[i] - b[i], 0) / indices.length;
+  if (Math.abs(shift) > 0.16) return distance(a, b);
+  let sum = 0,
+    n = 0;
+  for (let i = 0; i < a.length; i++) {
+    // Clipped-white fraction is discontinuous under a small exposure change.
+    if (i % 6 === 5) continue;
+    const delta = a[i] - b[i] - (indices.includes(i) ? shift : 0);
+    sum += delta * delta;
+    n++;
+  }
+  return Math.min(distance(a, b), Math.sqrt(sum / n) + 0.004);
+}
 function nearest(model: LocalModel, x: number[], kinds: Kind[]) {
   return model.units
     .filter((u) => kinds.includes(u.kind))
-    .reduce((n, u) => Math.min(n, distance(x, u.mean)), Infinity);
+    .reduce((n, u) => Math.min(n, appearanceDistance(x, u.mean)), Infinity);
 }
 export function decision(model: LocalModel, x: number[]) {
   const positive = nearest(model, x, ["keep", "add"]),
@@ -195,7 +216,32 @@ export function applyLearning(
     consider(d);
   // Scan only at sizes actually learned from manual additions; bounded work in
   // the vision worker also recovers a miss absent from the original proposals.
-  const sizes = model.units.filter((u) => u.kind === "add").slice(-8);
+  const learnedSizes = model.units.filter((u) => u.kind === "add").slice(-8);
+  // Match the current photograph's scale using retained examples of the same
+  // appearance. Camera distance need not match the training photograph.
+  const ratios = result.detections.flatMap((d) => {
+    const x = features(image, d.box);
+    const unit = model.units
+      .filter((u) => u.kind !== "remove")
+      .sort(
+        (a, b) => appearanceDistance(x, a.mean) - appearanceDistance(x, b.mean),
+      )[0];
+    return unit && appearanceDistance(x, unit.mean) < 0.04
+      ? [
+          Math.sqrt(
+            (d.box.width * d.box.height) /
+              (unit.width * image.width * unit.height * image.height),
+          ),
+        ]
+      : [];
+  });
+  const scale =
+    ratios.length >= 3 ? Math.max(0.5, Math.min(2, median(ratios))) : 1;
+  const sizes = learnedSizes.map((u) => ({
+    ...u,
+    width: u.width * scale,
+    height: u.height * scale,
+  }));
   let samples = 0;
   scan: for (const u of sizes) {
     const w = Math.max(6, u.width * image.width),
@@ -216,7 +262,7 @@ export function applyLearning(
         x += stride
       ) {
         if (++samples > 10000) break scan;
-        consider({
+        const candidate: Detection = {
           id: "",
           center: { x, y },
           box: { x: x - w / 2, y: y - h / 2, width: w, height: h },
@@ -224,7 +270,38 @@ export function applyLearning(
           contour: [],
           source: "ai",
           flags: [],
-        });
+        };
+        if (occupied(candidate)) continue;
+        const initial = decision(model, features(image, candidate.box));
+        if (initial.quality < 0.08) {
+          let best = candidate,
+            quality = initial.quality;
+          for (const step of [
+            Math.min(stride, w * 0.25),
+            Math.min(stride, w * 0.25) / 3,
+          ]) {
+            const origin = best;
+            for (const dy of [-step, 0, step])
+              for (const dx of [-step, 0, step]) {
+                const d = {
+                  ...origin,
+                  center: { x: origin.center.x + dx, y: origin.center.y + dy },
+                  box: {
+                    ...origin.box,
+                    x: origin.box.x + dx,
+                    y: origin.box.y + dy,
+                  },
+                };
+                if (!inside(d.box, result.roi)) continue;
+                const q = decision(model, features(image, d.box)).quality;
+                if (q < quality) {
+                  best = d;
+                  quality = q;
+                }
+              }
+          }
+          consider(best);
+        }
       }
   }
   for (const { d } of proposals.sort((a, b) => a.q - b.q))

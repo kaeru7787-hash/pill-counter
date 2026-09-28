@@ -78,8 +78,8 @@ test.describe("editing with deterministic CV fallback", () => {
     await page.locator("#list button").first().click();
     await page.locator("#delete-selected").click();
     await expect(page.locator("#count")).toHaveText("23");
-    await page.locator("#confirmed").check();
-    await expect(page.locator("#count-label")).toHaveText("目視確認済みの個数");
+    await expect(page.locator("#confirmed")).toHaveCount(0);
+    await expect(page.locator("#count-label")).toHaveText("補正後の個数");
     await page.locator("#save").click();
     await expect(page.locator("#status")).toContainText("この端末に保存");
     const downloadPromise = page.waitForEvent("download");
@@ -92,7 +92,7 @@ test.describe("editing with deterministic CV fallback", () => {
     expect(data.records[0].corrected).toHaveLength(23);
     expect(data.records[0].analysis.detections).toHaveLength(24);
     expect(data.records[0].original).toMatch(/^data:image\/png;base64,/);
-    expect(data.records[0].confirmed).toBe(true);
+    expect(data.records[0].confirmed).toBe(false);
     page.on("dialog", (d) => d.accept());
     await page.locator("#debug").check();
     await expect(page.locator("#status")).toContainText("解析完了");

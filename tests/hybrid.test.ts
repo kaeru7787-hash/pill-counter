@@ -107,3 +107,25 @@ test("local refinement has a fixed budget and stays within explicit ROI", () => 
     );
   }
 });
+
+test("AI box shifted inside an already matched complete optical contour is not counted twice", () => {
+  const cv = pills.map((d) => ({
+    ...d,
+    contour: Array.from({ length: 32 }, (_, i) => ({
+      x: d.center.x + 20 * Math.cos((i * Math.PI) / 16),
+      y: 80 + 20 * Math.sin((i * Math.PI) / 16),
+    })),
+  }));
+  const shifted = pill(cv[0].center.x + 19);
+  const missing = pill(700);
+  const refs = [...cv, shifted, missing];
+  const result = infer(cv, refs);
+  assert.equal(result.detections.length, 9);
+  assert.equal(result.added.length, 1);
+  assert.equal(result.added[0].center.x, 700);
+  assert.ok(
+    result.rejected.some((d) =>
+      d.flags.includes("検出済み輪郭の内部にある重複候補"),
+    ),
+  );
+});

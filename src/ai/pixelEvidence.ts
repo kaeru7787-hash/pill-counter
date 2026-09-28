@@ -90,7 +90,8 @@ export function pixelRejection(
     freeMatching = 0,
     occupied = 0;
   const lights: number[] = [],
-    outer: number[] = [];
+    outer: number[] = [],
+    chroma: number[] = [];
   const near = neighbors.filter(
     (p) =>
       p !== d &&
@@ -115,6 +116,7 @@ export function pixelRejection(
       const c = sample(px, py);
       if (!c) continue;
       n++;
+      chroma.push(c[0] - c[2]);
       lights.push((c[0] + c[1] + c[2]) / 3);
       const owns = near.some(
         (p) =>
@@ -140,6 +142,10 @@ export function pixelRejection(
   const center = median(lights),
     surround = median(outer),
     refLight = rgb.reduce((a, b) => a + b) / 3;
+  // A neutral specular highlight cannot supply the chromatic body of a
+  // consistent coloured family. Brightness alone previously passed this test.
+  if (rgb[0] - rgb[2] > 35 && median(chroma) < (rgb[0] - rgb[2]) * 0.35)
+    return ["錠剤群の色成分がない", "無彩色の反射・背景の可能性"];
   const edge = boundaryEvidence(image, d);
   // Only use a sharp, round, photo-local reference. Weakly lit or elongated
   // tablets retain the conservative color checks below.
@@ -147,6 +153,7 @@ export function pixelRejection(
     if (edge < reference.edge * 0.18 && center < refLight * 0.92)
       return ["候補自身の外周が確認できない", "周辺錠剤・背景の領域"];
     if (
+      !d.flags.includes("独立した円周支持") &&
       d.area < reference.area * 0.65 &&
       edge < reference.edge * 0.6 &&
       (d.shape?.circularity ?? 1) < 0.78

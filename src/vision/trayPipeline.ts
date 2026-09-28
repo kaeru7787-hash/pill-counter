@@ -119,19 +119,46 @@ export async function analyzeTray(
         if (
           !support.data[i] ||
           sat > 0.48 ||
+          (b > r * 1.08 && b > g * 1.05) ||
           (smooth.data[i] < threshold * 1.1 && !local.data[i])
         )
           mask.data[i] = 0;
       }
     const raw = primary.clone();
     owned.push(raw);
+    // Engraving and printed text are interior holes, not missing pill material.
+    // Fill them before measuring solidity; otherwise printed pills cannot define
+    // the shape reference and the tray path silently falls back to colour blobs.
+    const outlines = keep(new cv.MatVector()),
+      outlineHierarchy = mat();
+    cv.findContours(
+      primary,
+      outlines,
+      outlineHierarchy,
+      cv.RETR_EXTERNAL,
+      cv.CHAIN_APPROX_SIMPLE,
+    );
+    cv.drawContours(primary, outlines, -1, new cv.Scalar(255), -1);
     // Estimate from compact single objects, never from area-weighted merged blobs.
     const initial = contours(cv, primary, "raw");
+    const compact = initial.filter(
+      (d) =>
+        d.shape!.solidity > 0.93 &&
+        d.shape!.circularity > 0.5 &&
+        d.shape!.aspect < 3.3 &&
+        d.area > w * h * 0.00004 &&
+        d.area < w * h * 0.025,
+    );
+    const elongated = compact.filter((d) => d.shape!.aspect > 1.55);
+    const oblong =
+      elongated.length >= 8 && elongated.length > compact.length * 0.5;
     const singles = initial.filter(
       (d) =>
         d.shape!.solidity > 0.94 &&
-        d.shape!.circularity > 0.78 &&
-        d.shape!.aspect < 1.45 &&
+        d.shape!.circularity > (oblong ? 0.5 : 0.78) &&
+        (oblong
+          ? d.shape!.aspect > 1.55 && d.shape!.aspect < 3.3
+          : d.shape!.aspect < 1.45) &&
         d.area < w * h * 0.025,
     );
     const radii = singles
@@ -184,17 +211,18 @@ export async function analyzeTray(
     const components = contours(cv, primary, "component");
     // Hough supplies extra markers and a cross-check; accepted watershed contours determine the count.
     const circles = mat();
-    cv.HoughCircles(
-      smooth,
-      circles,
-      cv.HOUGH_GRADIENT,
-      1,
-      diameter * 0.7,
-      100,
-      p.houghSensitivity ?? 24,
-      Math.max(1, Math.round(radius * (p.houghMin ?? 0.75))),
-      Math.max(2, Math.round(radius * (p.houghMax ?? 1.3))),
-    );
+    if (!oblong)
+      cv.HoughCircles(
+        smooth,
+        circles,
+        cv.HOUGH_GRADIENT,
+        1,
+        diameter * 0.7,
+        100,
+        p.houghSensitivity ?? 24,
+        Math.max(1, Math.round(radius * (p.houghMin ?? 0.75))),
+        Math.max(2, Math.round(radius * (p.houghMax ?? 1.3))),
+      );
     const hough: Detection[] = [];
     for (let i = 0; i < circles.data32F.length; i += 3) {
       const [x, y, r] = circles.data32F.subarray(i, i + 3);
@@ -213,7 +241,7 @@ export async function analyzeTray(
         });
     }
 
-    if (hough.length < 3 && !p.diameter) return undefined;
+    if (!oblong && hough.length < 3 && !p.diameter) return undefined;
     const hints =
       median(
         singles
@@ -227,7 +255,7 @@ export async function analyzeTray(
       primary,
       { x: 0, y: 0 },
       p.minimumDistance ?? 1,
-      radius,
+      oblong ? undefined : radius,
       hints,
     );
     const alternate = splitWatershed(
@@ -235,7 +263,7 @@ export async function analyzeTray(
       alternative,
       { x: 0, y: 0 },
       (p.minimumDistance ?? 1) * 1.06,
-      radius,
+      oblong ? undefined : radius,
     );
     for (const s of [splits, alternate]) {
       owned.push(s.distance, s.markers, s.seedsImage);
@@ -245,7 +273,7 @@ export async function analyzeTray(
     const accept = (d: Detection) =>
       d.area >= area * minArea &&
       d.area <= area * maxArea &&
-      d.shape!.aspect < 1.8 &&
+      d.shape!.aspect < (oblong ? 3.4 : 1.8) &&
       d.shape!.circularity >= (p.minCircularity ?? 0.5) &&
       d.shape!.solidity >= (p.minSolidity ?? 0.65) &&
       !!support.data[Math.round(d.center.y) * w + Math.round(d.center.x)];
@@ -265,6 +293,15 @@ export async function analyzeTray(
     const detections = b
       .sort((a, b) => a.center.y - b.center.y || a.center.x - b.center.x)
       .map((d, i) => ({ ...d, id: `cv-${i + 1}` }));
+    for (const d of detections)
+      if (
+        hough.some(
+          (c) =>
+            Math.hypot(c.center.x - d.center.x, c.center.y - d.center.y) <
+            radius * 0.5,
+        )
+      )
+        d.flags.push("独立した円周支持");
     const counts = { A: a.length, B: b.length, C: c.length };
     if (settings.debug) {
       const raster = (m: any, mode = "gray"): DebugImage => {
@@ -313,7 +350,7 @@ export async function analyzeTray(
       debug,
       diagnostics: [
         `Otsu ${t.toFixed(1)} / threshold ${threshold.toFixed(1)}`,
-        `推定直径 ${diameter.toFixed(1)}px / 単独候補 ${singles.length}`,
+        `推定直径 ${diameter.toFixed(1)}px / 単独候補 ${singles.length} / 形状 ${oblong ? "長円" : "円"}`,
         `分離前 ${components.length} / 種 ${splits.seedCount} / 分離後 ${splits.detections.length} / 採用 ${b.length}`,
         `Hough ${hough.length}`,
         `トレー外除外 ${useTray ? "ON" : "手動ROIまたはOFF"}`,
