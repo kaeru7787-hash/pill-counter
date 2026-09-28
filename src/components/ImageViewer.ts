@@ -1,4 +1,5 @@
 import type { Analysis, Detection, Point, ROI } from "../types";
+import { aiMarkerRadius } from "./markerSize";
 export type Mode = "select" | "add" | "delete" | "roi" | "batch";
 export class ImageViewer {
   original?: HTMLCanvasElement;
@@ -96,9 +97,18 @@ export class ImageViewer {
     const ctx = this.canvas.getContext("2d")!;
     return [...this.detections].reverse().find((d) => {
       ctx.beginPath();
-      d.contour.forEach((pt, i) =>
-        i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y),
-      );
+      if (d.source === "ai")
+        ctx.arc(
+          d.center.x,
+          d.center.y,
+          aiMarkerRadius(d, this.detections),
+          0,
+          Math.PI * 2,
+        );
+      else
+        d.contour.forEach((pt, i) =>
+          i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y),
+        );
       ctx.closePath();
       return (
         ctx.isPointInPath(p.x, p.y) ||
@@ -142,9 +152,18 @@ export class ImageViewer {
       ).forEach((d, i) => {
         const selected = !finalOnly && d.id === this.selected;
         ctx.beginPath();
-        d.contour.forEach((p, j) =>
-          j ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y),
-        );
+        if (d.source === "ai")
+          ctx.arc(
+            d.center.x,
+            d.center.y,
+            aiMarkerRadius(d, this.detections),
+            0,
+            Math.PI * 2,
+          );
+        else
+          d.contour.forEach((p, j) =>
+            j ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y),
+          );
         ctx.closePath();
         ctx.lineWidth = Math.max(1.5, c.width / 450);
         ctx.strokeStyle = selected

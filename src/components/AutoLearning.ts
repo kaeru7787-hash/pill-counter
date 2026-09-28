@@ -50,12 +50,22 @@ export class AutoLearning {
       );
       this.store.stage(this.session.id, model);
       this.failed = false;
-      this.output.textContent =
-        "補正を自動学習済み。次の画像・終了時に反映します。";
+      const effect = analysis.learning;
+      this.output.textContent = model.updates
+        ? "補正を自動学習済み。次の画像・終了時に反映します。"
+        : effect?.updates
+          ? `学習 ${effect.updates}回・今回の反映：追加 ${effect.added} / 除外 ${effect.removed}`
+          : "追加・削除した補正から自動学習します。";
     } catch {
       this.failed = true;
       this.error();
     }
+  }
+  report(analysis: Analysis) {
+    const effect = analysis.learning;
+    this.output.textContent = effect?.updates
+      ? `学習 ${effect.updates}回・今回の反映：追加 ${effect.added} / 除外 ${effect.removed}`
+      : "追加・削除した補正から自動学習します。";
   }
   finish() {
     if (!this.store) return;
@@ -65,8 +75,10 @@ export class AutoLearning {
     }
     try {
       if (this.session) this.store.finish(this.session.target, this.session.id);
-      this.output.textContent =
-        "自動学習を反映しました。学習用の画像は保持していません。";
+      const model = this.session && this.store.model(this.session.target);
+      this.output.textContent = model?.updates
+        ? `学習 ${model.updates}回を反映済み。学習用画像は保持しません。`
+        : "追加・削除した補正から自動学習します。";
     } catch {
       this.error();
     }
