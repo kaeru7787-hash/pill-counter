@@ -109,9 +109,17 @@ export async function detectAI(
 }> {
   try {
     let config = { ...defaults };
-    const cfg = await fetch(new URL(modelKind === "bottle" ? "models/bottle-config.json" : "models/config.json", baseURL), {
-      signal: AbortSignal.timeout(5000),
-    });
+    const cfg = await fetch(
+      new URL(
+        modelKind === "bottle"
+          ? "models/bottle-config.json"
+          : "models/config.json",
+        baseURL,
+      ),
+      {
+        signal: AbortSignal.timeout(5000),
+      },
+    );
     if (cfg.ok && cfg.headers.get("content-type")?.includes("json"))
       config = { ...config, ...(await cfg.json()) };
     else if (modelKind === "bottle")
@@ -137,7 +145,10 @@ export async function detectAI(
     )
       throw new Error("モデル設定が不正または未対応です");
     const modelURL = new URL(
-      config.modelURL || (modelKind === "bottle" ? "models/eyedrop-bottle.onnx" : "models/pill-counter.onnx"),
+      config.modelURL ||
+        (modelKind === "bottle"
+          ? "models/eyedrop-bottle.onnx"
+          : "models/pill-counter.onnx"),
       baseURL,
     );
     if (
@@ -196,7 +207,15 @@ export async function detectAI(
       executionProviders: ["wasm"],
     });
     try {
-      return await inferViews(image, roi, config, session, ort, cvCandidates, modelKind === "pill");
+      return await inferViews(
+        image,
+        roi,
+        config,
+        session,
+        ort,
+        cvCandidates,
+        modelKind === "pill",
+      );
     } finally {
       await session.release();
     }
@@ -313,9 +332,81 @@ export async function inferViews(
       ),
     );
   }
-  const regions = refine
-    ? reviewRegions(image, roi, [...detections, ...tiles], cvCandidates)
-    : [];
+  // Keep a pill about 40–55 model pixels wide in dense photographs. A fixed
+  // whole-photo/4-view resize discards the separating edges of small objects.
+  const compact = cvCandidates.filter(
+    (d) => d.shape && d.shape.solidity > 0.9 && d.area > 25,
+  );
+  const lengths = compact
+    .map((d) => Math.max(d.box.width, d.box.height))
+    .sort((a, b) => a - b);
+  const typical = lengths[Math.floor(lengths.length / 2)] || 0;
+  let shapeViews = 0;
+  if (
+    refine &&
+    cvCandidates.length >= 150 &&
+    typical > 0 &&
+    ((typical * config.inputSize) / Math.max(tw, th) < 30 ||
+      detections.length < cvCandidates.length * 0.8)
+  ) {
+    const side = Math.max(
+      384,
+      Math.round(typical * 12),
+      Math.sqrt((roi.width * roi.height) / 12),
+    );
+    const width = Math.min(roi.width, Math.round(side)),
+      height = Math.min(roi.height, Math.round(side));
+    const nx = Math.ceil((roi.width - width) / (width * 0.75)) + 1;
+    const ny = Math.ceil((roi.height - height) / (height * 0.75)) + 1;
+    for (let iy = 0; iy < ny; iy++)
+      for (let ix = 0; ix < nx; ix++) {
+        const r = {
+          x: Math.round(
+            roi.x + ((roi.width - width) * ix) / Math.max(1, nx - 1),
+          ),
+          y: Math.round(
+            roi.y + ((roi.height - height) * iy) / Math.max(1, ny - 1),
+          ),
+          width,
+          height,
+        };
+        // Skip empty areas using optical foreground candidates, not a crop that
+        // would discard isolated pills. Each occupied tile gets two exposures.
+        if (
+          !cvCandidates.some(
+            (d) =>
+              d.center.x >= r.x &&
+              d.center.x <= r.x + width &&
+              d.center.y >= r.y &&
+              d.center.y <= r.y + height,
+          )
+        )
+          continue;
+        for (const normalize of [false, true]) {
+          const ds = await infer(
+            r,
+            `shape-${ix}-${iy}-${normalize}`,
+            normalize,
+          );
+          tiles.push(
+            ...ds.filter(
+              (d) =>
+                (r.x === roi.x || d.box.x > r.x + 2) &&
+                (r.y === roi.y || d.box.y > r.y + 2) &&
+                (r.x + width === roi.x + roi.width ||
+                  d.box.x + d.box.width < r.x + width - 2) &&
+                (r.y + height === roi.y + roi.height ||
+                  d.box.y + d.box.height < r.y + height - 2),
+            ),
+          );
+        }
+        shapeViews++;
+      }
+  }
+  const regions =
+    refine && !shapeViews
+      ? reviewRegions(image, roi, [...detections, ...tiles], cvCandidates)
+      : [];
   for (const [i, r] of regions.entries()) {
     for (const normalized of [false, true]) {
       const ds = await infer(
@@ -340,6 +431,6 @@ export async function inferViews(
     regions,
     detections,
     tiles,
-    status: `ONNXモデルで照合済み（全体＋4区画） / 局所再解析 ${regions.length}領域`,
+    status: `ONNXモデルで照合済み（全体＋4区画） / 局所再解析 ${regions.length}領域 / 形状に合わせた拡大 ${shapeViews}区画`,
   };
 }

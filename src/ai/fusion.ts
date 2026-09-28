@@ -116,6 +116,24 @@ export function fuse(
         flags: [...a.flags, "AI merged CV fragments: manual review required"],
       });
     } else if (!group.length) {
+      // A second AI box can be shifted onto the edge of a tablet whose centre
+      // was already matched to another view. Do not add it inside a complete,
+      // independently measured foreground contour.
+      const covered = accepted.some(
+        (c) =>
+          c.shape &&
+          c.shape.solidity > 0.9 &&
+          c.area > profile.area * 0.65 &&
+          c.area < profile.area * 1.5 &&
+          contains(c, a.center),
+      );
+      if (covered) {
+        rejected.push({
+          ...a,
+          flags: [...a.flags, "検出済み輪郭の内部にある重複候補"],
+        });
+        continue;
+      }
       detections.push({
         ...a,
         flags: [...a.flags, "AI rescue: manual review required"],
@@ -134,4 +152,18 @@ export function fuse(
     requiresReview:
       added.length > 0 || removed.length > 0 || rejected.length > 0,
   };
+}
+
+export function contains(d: Detection, p: { x: number; y: number }) {
+  let inside = false;
+  for (let i = 0, j = d.contour.length - 1; i < d.contour.length; j = i++) {
+    const a = d.contour[i],
+      b = d.contour[j];
+    if (
+      a.y > p.y !== b.y > p.y &&
+      p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x
+    )
+      inside = !inside;
+  }
+  return inside;
 }
