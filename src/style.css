@@ -638,3 +638,7 @@ summary {
 
 #image-canvas { flex-shrink: 0; max-width: none; touch-action: none; transform-origin: center; }
 #zoom { width: 120px; }
+
+.ellipse-debug { overflow-x: auto; max-height: 28rem; font-size: .75rem; }
+.ellipse-debug table { border-collapse: collapse; min-width: 48rem; }
+.ellipse-debug th, .ellipse-debug td { padding: .3rem; border-bottom: 1px solid #d6e0e6; text-align: left; }

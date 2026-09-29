@@ -1,5 +1,32 @@
 export type Point = { x: number; y: number };
 export type ROI = { x: number; y: number; width: number; height: number };
+export type ObjectMeasurement = {
+  major: number;
+  minor: number;
+  angle: number; // radians, major axis in image coordinates
+  area: number;
+  method: "contour" | "pixels" | "box";
+  contour: Point[]; // measured outline; never replaces the original detection
+};
+export type ReferenceEllipse = {
+  major: number;
+  minor: number;
+  area: number;
+  sampleCount: number;
+  retainedCount: number;
+  trimmedEachEnd: number;
+  mean: { major: number; minor: number };
+  median: { major: number; minor: number };
+  usedMedian: { major: boolean; minor: boolean };
+};
+export type EllipseAssessment = {
+  status: "normal" | "review" | "exclusion-candidate" | "excluded";
+  majorRatio?: number;
+  minorRatio?: number;
+  areaRatio?: number;
+  match?: { iou: number; coverage: number; containment: number };
+  reasons: string[];
+};
 export type Detection = {
   id: string;
   center: Point;
@@ -10,6 +37,10 @@ export type Detection = {
   flags: string[];
   group?: string;
   score?: number;
+  measurement?: ObjectMeasurement;
+  markerAngle?: number; // optional image-edge estimate for the reference marker
+  markerAngleSupport?: number;
+  ellipseAssessment?: EllipseAssessment;
   shape?: {
     circularity: number;
     solidity: number;
@@ -69,6 +100,11 @@ export type Analysis = {
   estimatedDiameter?: number;
   candidates?: Detection[];
   rejectedCandidates?: Detection[];
+  ellipseReview?: {
+    reference?: ReferenceEllipse;
+    optical: Detection[];
+    rejected: Detection[];
+  };
 };
 export type WorkerRequest = {
   id: number;
