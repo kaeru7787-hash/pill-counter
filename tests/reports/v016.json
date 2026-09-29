@@ -1,0 +1,365 @@
+{
+  "version": "0.16.0",
+  "unitTests": 61,
+  "cvRegression": [
+    {
+      "file": "01-white-separated.png",
+      "truth": 24,
+      "before": 24,
+      "after": 24,
+      "review": 0,
+      "removed": []
+    },
+    {
+      "file": "02-yellow-oval.png",
+      "truth": 15,
+      "before": 15,
+      "after": 15,
+      "review": 0,
+      "removed": []
+    },
+    {
+      "file": "03-capsules.png",
+      "truth": 12,
+      "before": 12,
+      "after": 12,
+      "review": 0,
+      "removed": []
+    },
+    {
+      "file": "04-touching-pairs.png",
+      "truth": 4,
+      "before": 4,
+      "after": 4,
+      "review": 0,
+      "removed": []
+    },
+    {
+      "file": "05-touching-three.png",
+      "truth": 3,
+      "before": 3,
+      "after": 3,
+      "review": 0,
+      "removed": []
+    },
+    {
+      "file": "06-mixed-sizes.png",
+      "truth": 15,
+      "before": 15,
+      "after": 15,
+      "review": 10,
+      "removed": []
+    },
+    {
+      "file": "07-scored-tablets.png",
+      "truth": 15,
+      "before": 15,
+      "after": 15,
+      "review": 0,
+      "removed": []
+    },
+    {
+      "file": "08-tray-rim.png",
+      "truth": 15,
+      "before": 15,
+      "after": 15,
+      "review": 0,
+      "removed": []
+    },
+    {
+      "file": "09-bag-artifacts.png",
+      "truth": 15,
+      "before": 15,
+      "after": 15,
+      "review": 0,
+      "removed": []
+    },
+    {
+      "file": "10-desk-color.png",
+      "truth": 15,
+      "before": 15,
+      "after": 15,
+      "review": 0,
+      "removed": []
+    },
+    {
+      "file": "11-specks.png",
+      "truth": 15,
+      "before": 15,
+      "after": 15,
+      "review": 0,
+      "removed": []
+    },
+    {
+      "file": "12-shadow.png",
+      "truth": 15,
+      "before": 15,
+      "after": 15,
+      "review": 0,
+      "removed": []
+    },
+    {
+      "file": "13-empty.png",
+      "truth": 0,
+      "before": 0,
+      "after": 0,
+      "review": 0,
+      "removed": []
+    },
+    {
+      "file": "14-dense-90.png",
+      "truth": 90,
+      "before": 90,
+      "after": 90,
+      "review": 0,
+      "removed": []
+    },
+    {
+      "file": "15-edge-cut.png",
+      "truth": 2,
+      "before": 2,
+      "after": 2,
+      "review": 1,
+      "removed": []
+    },
+    {
+      "file": "16-low-contrast.png",
+      "truth": 15,
+      "before": 15,
+      "after": 15,
+      "review": 0,
+      "removed": []
+    },
+    {
+      "file": "17-white-reflection.png",
+      "truth": 15,
+      "before": 15,
+      "after": 15,
+      "review": 0,
+      "removed": []
+    },
+    {
+      "file": "18-real-tray.jpg",
+      "truth": 90,
+      "before": 90,
+      "after": 90,
+      "review": 2,
+      "removed": []
+    },
+    {
+      "file": "19-bag-round.jpg",
+      "truth": 12,
+      "before": 12,
+      "after": 12,
+      "review": 0,
+      "removed": []
+    },
+    {
+      "file": "20-bag-oblong.jpg",
+      "truth": 36,
+      "before": 36,
+      "after": 36,
+      "review": 16,
+      "removed": []
+    },
+    {
+      "file": "21-yellow-tray-round.png",
+      "truth": 12,
+      "before": 12,
+      "after": 12,
+      "review": 0,
+      "removed": []
+    },
+    {
+      "file": "22-yellow-tray-oblong.png",
+      "truth": 36,
+      "before": 36,
+      "after": 36,
+      "review": 6,
+      "removed": []
+    }
+  ],
+  "annotatedHybrid": [
+    {
+      "engine": "chromium",
+      "file": "18-real-tray.jpg",
+      "truth": 90,
+      "detected": 90,
+      "tp": 90,
+      "fp": 0,
+      "fn": 0
+    },
+    {
+      "engine": "chromium",
+      "file": "19-bag-round.jpg",
+      "truth": 12,
+      "detected": 12,
+      "tp": 12,
+      "fp": 0,
+      "fn": 0
+    },
+    {
+      "engine": "chromium",
+      "file": "20-bag-oblong.jpg",
+      "truth": 36,
+      "detected": 36,
+      "tp": 36,
+      "fp": 0,
+      "fn": 0
+    },
+    {
+      "engine": "chromium",
+      "file": "21-yellow-tray-round.png",
+      "truth": 12,
+      "detected": 12,
+      "tp": 12,
+      "fp": 0,
+      "fn": 0
+    },
+    {
+      "engine": "chromium",
+      "file": "22-yellow-tray-oblong.png",
+      "truth": 36,
+      "detected": 36,
+      "tp": 36,
+      "fp": 0,
+      "fn": 0
+    },
+    {
+      "engine": "webkit-mobile",
+      "file": "18-real-tray.jpg",
+      "truth": 90,
+      "detected": 90,
+      "tp": 90,
+      "fp": 0,
+      "fn": 0
+    },
+    {
+      "engine": "webkit-mobile",
+      "file": "19-bag-round.jpg",
+      "truth": 12,
+      "detected": 12,
+      "tp": 12,
+      "fp": 0,
+      "fn": 0
+    },
+    {
+      "engine": "webkit-mobile",
+      "file": "20-bag-oblong.jpg",
+      "truth": 36,
+      "detected": 36,
+      "tp": 36,
+      "fp": 0,
+      "fn": 0
+    },
+    {
+      "engine": "webkit-mobile",
+      "file": "21-yellow-tray-round.png",
+      "truth": 12,
+      "detected": 12,
+      "tp": 12,
+      "fp": 0,
+      "fn": 0
+    },
+    {
+      "engine": "webkit-mobile",
+      "file": "22-yellow-tray-oblong.png",
+      "truth": 36,
+      "detected": 36,
+      "tp": 36,
+      "fp": 0,
+      "fn": 0
+    }
+  ],
+  "privateSampleCountsOnly": [
+    {
+      "sample": "sample-5",
+      "version": "0.16.0",
+      "count": 89,
+      "review": 0,
+      "ai": 0,
+      "aiWithEstimatedDirection": 0,
+      "restoration": [
+        "AI置換未成立の光学候補を要確認として復元 0"
+      ]
+    },
+    {
+      "sample": "sample-6",
+      "version": "0.16.0",
+      "count": 488,
+      "review": 14,
+      "ai": 0,
+      "aiWithEstimatedDirection": 0,
+      "restoration": [
+        "AI置換未成立の光学候補を要確認として復元 0"
+      ]
+    },
+    {
+      "sample": "sample-7",
+      "version": "0.16.0",
+      "count": 174,
+      "review": 5,
+      "ai": 1,
+      "aiWithEstimatedDirection": 0,
+      "restoration": [
+        "AI置換未成立の光学候補を要確認として復元 0"
+      ]
+    },
+    {
+      "sample": "sample-8",
+      "version": "0.16.0",
+      "count": 46,
+      "review": 1,
+      "ai": 0,
+      "aiWithEstimatedDirection": 0,
+      "restoration": [
+        "AI置換未成立の光学候補を要確認として復元 0"
+      ]
+    },
+    {
+      "sample": "sample-9",
+      "version": "0.16.0",
+      "count": 983,
+      "review": 582,
+      "ai": 588,
+      "aiWithEstimatedDirection": 588,
+      "restoration": [
+        "AI置換未成立の光学候補を要確認として復元 0"
+      ]
+    },
+    {
+      "sample": "arrangement-4",
+      "version": "0.16.0",
+      "count": 983,
+      "review": 694,
+      "ai": 707,
+      "aiWithEstimatedDirection": 707,
+      "restoration": [
+        "AI置換未成立の光学候補を要確認として復元 0"
+      ]
+    },
+    {
+      "sample": "arrangement-5",
+      "version": "0.16.0",
+      "count": 983,
+      "review": 534,
+      "ai": 577,
+      "aiWithEstimatedDirection": 577,
+      "restoration": [
+        "AI置換未成立の光学候補を要確認として復元 0"
+      ]
+    },
+    {
+      "sample": "bag20",
+      "version": "0.16.0",
+      "count": 36,
+      "review": 16,
+      "ai": 4,
+      "aiWithEstimatedDirection": 4,
+      "restoration": [
+        "AI置換未成立の光学候補を要確認として復元 1"
+      ]
+    }
+  ],
+  "note": "Private photos and detection coordinates are not distributed. Unknown true counts cannot establish precision or recall."
+}
