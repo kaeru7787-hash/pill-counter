@@ -20,3 +20,8 @@ Create one app mascot illustration matching the green faceless pictogram people 
 
 ### v0.15.0 直接ピンチ編集
 02-edit.png was edited with built-in ImageGen and visually inspected. Prompt: preserve page 2/3, green medical pictogram mascot and navy/mint palette; replace range controls and separate zoom view with four panels: basic select/add/delete; pinch and pan only in select mode; undo/redo/reset; edit while keeping zoom and position, zoom slider and fit image. Footer: 確認できたら、保存へ and v0.15.0. Remove all learning references.
+
+## v0.16.0 漫画のUI追従
+
+3ページとも既存画像を編集対象としてbuilt-in ImageGenで更新し、出力を目視確認。第1章は基準楕円と水色実線・青実線・橙破線の意味、要確認も個数に含む説明へ変更。第2章は旧ボタン名を「拡大・縮小」へ統一し、そのモードでのみピンチ操作できる説明を維持。第3章は破線と全体の確認、端末に応じた保存操作を説明。全ページの版表記はv0.16.0。マスコット・配色・章構成は保持し、認識や操作のコードは変更していない。
+
