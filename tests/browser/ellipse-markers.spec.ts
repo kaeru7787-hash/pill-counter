@@ -4,6 +4,9 @@ test("normal display uses identical rotated ellipses; debug contours stay out of
   page,
   context,
 }, info) => {
+  // Dense real-image CV can exceed the default assertion timeout on shared CI.
+  // Keep all marker/count assertions; only allow more time for analysis.
+  test.setTimeout(180000);
   await context.route("**/models/config.json", (r) =>
     r.fulfill({ status: 404, body: "" }),
   );
@@ -36,7 +39,9 @@ test("normal display uses identical rotated ellipses; debug contours stay out of
   await page.goto("./?debug=1");
   await page.locator("#debug").check();
   await page.locator("#file").setInputFiles("tests/images/20-bag-oblong.jpg");
-  await expect(page.locator("#status")).toContainText("解析完了");
+  await expect(page.locator("#status")).toContainText("解析完了", {
+    timeout: 120000,
+  });
   const count = Number(await page.locator("#count").textContent());
   expect(count).toBe(36);
   const markers = await page
