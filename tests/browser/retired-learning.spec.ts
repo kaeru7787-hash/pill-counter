@@ -156,7 +156,7 @@ test("retired learning is removed, explicit results and model cache survive; edi
   for await (const part of (await (await pending).createReadStream())!)
     exported += part.toString();
   const record = JSON.parse(exported).records.find((r: any) => r.analysis);
-  expect(record.analysis.version).toBe("0.15.0");
+  expect(record.analysis.version).toBe("0.16.0");
   expect(record.analysis.learning).toBeUndefined();
 });
 test("old tab blocking database deletion does not block inference, release completes deletion", async ({
